@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>港口防線</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,6 +22,9 @@
 *{box-sizing:border-box}
 body{margin:0}
 [hidden]{display:none!important}
+html,body{touch-action:manipulation}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+input{-webkit-user-select:text;user-select:text}
 body{
   background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
   padding-block:16px;
@@ -39,7 +42,7 @@ h1{font-family:var(--font-num);font-size:30px;letter-spacing:.12em;margin:0;font
 .main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
 .stagecol{display:flex;flex-direction:column;gap:8px;min-width:0}
 .stage{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#10262d}
-canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;cursor:crosshair;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;cursor:crosshair;touch-action:none;-webkit-tap-highlight-color:transparent}
 .hint{margin:0;color:var(--muted);font-size:13px;min-height:20px}
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,20,25,.82);padding:16px;overflow:auto}
 .ocard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 24px;max-width:360px;width:100%;display:flex;flex-direction:column;gap:10px;text-align:center;margin:auto}
@@ -89,6 +92,7 @@ input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--lin
 @media (max-width:860px){
   .main{grid-template-columns:minmax(0,1fr)}
   h1{font-size:26px}
+  #selPanel.active{order:-1;border-color:var(--amber)}
 }
 @media (prefers-reduced-motion:reduce){button{transition:none}}
 </style>
@@ -269,7 +273,7 @@ const PH = ['idle', 'running', 'over'];
 const PCOL = ['#f2b441', '#7fd8f0', '#ff8fb1', '#b9e36a'];
 
 let state, towers, enemies, projs, fx, parts, floats, queue, spawnT, strikes;
-let armed = null, armedAb = null, selected = null, hover = null, kills = 0, best = 0, time = 0, tid = 0, eid = 0;
+let armed = null, armedAb = null, selected = null, hover = null, pending = null, kills = 0, best = 0, time = 0, tid = 0, eid = 0;
 let role = 'solo', peer = null, hostConn = null, players = [], myId = 0, outbox = [], menuOpen = true;
 let emap = new Map(), roomCode = '', diffPick = 'normal', muted = false;
 try { best = +localStorage.getItem(KEY) || 0; muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
@@ -814,12 +818,14 @@ function render() {
   ctx.setLineDash([8, 22]); ctx.lineDashOffset = -time * 28;
   ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
   ctx.restore();
-  if (armed && hover && hover.c >= 0 && hover.c < COLS && hover.r >= 0 && hover.r < ROWS) {
-    const ok = canPlace(hover.c, hover.r), afford = state.gold >= TOWERS[armed].cost;
+  const aim = pending || hover;
+  if (armed && aim && aim.c >= 0 && aim.c < COLS && aim.r >= 0 && aim.r < ROWS) {
+    const ok = canPlace(aim.c, aim.r), afford = state.gold >= TOWERS[armed].cost;
     ctx.fillStyle = ok && afford ? 'rgba(111,220,154,.28)' : 'rgba(255,123,123,.3)';
-    ctx.fillRect(hover.c * C, hover.r * C, C, C);
+    ctx.fillRect(aim.c * C, aim.r * C, C, C);
+    if (pending) { ctx.save(); ctx.strokeStyle = '#e6f0f2'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.strokeRect(aim.c * C + 2, aim.r * C + 2, C - 4, C - 4); ctx.restore(); }
     if (ok) {
-      const gt = { type: armed, x: hover.c * C + C / 2, y: hover.r * C + C / 2, lvl: 1, ang: -Math.PI / 2, recoil: 0 };
+      const gt = { type: armed, x: aim.c * C + C / 2, y: aim.r * C + C / 2, lvl: 1, ang: -Math.PI / 2, recoil: 0 };
       rangeCircle(gt.x, gt.y, TOWERS[armed].range, TOWERS[armed].color, true);
       drawTower(gt, true);
     }
@@ -906,11 +912,11 @@ function buildShop() {
 function arm(type) {
   if (state.phase === 'over') return;
   armed = armed === type ? null : type;
-  armedAb = null; selected = null;
+  armedAb = null; selected = null; pending = null;
   if (armed) setHint(`${TOWERS[armed].name}：${TOWERS[armed].desc}。點擊地圖空地放置。`);
   refreshAll();
 }
-function disarm() { armed = null; armedAb = null; refreshAll(); }
+function disarm() { armed = null; armedAb = null; pending = null; refreshAll(); }
 function fmtCd(v) { return v > 0 ? `冷卻 ${Math.ceil(v)} 秒` : '就緒'; }
 function updateAbilityUI() {
   const a = $('abAir'), f = $('abFreeze');
@@ -952,6 +958,7 @@ function renderPreview() {
 }
 function renderSel() {
   const el = $('selPanel');
+  el.classList.toggle('active', !!(armed || selected));
   if (armed) {
     const d = TOWERS[armed];
     el.innerHTML = `<h2>準備建造</h2><div class="sel-head"><i class="dot" style="background:${d.color}"></i><b>${d.name}</b></div><p class="muted">${d.desc}。點擊地圖空地放置，Esc 或右鍵取消。</p>`;
@@ -1187,6 +1194,7 @@ function pointer(ev) {
 let curAt = 0;
 canvas.addEventListener('pointermove', ev => {
   hover = pointer(ev);
+  if (ev.pointerType !== 'mouse' && armed && pending && ev.buttons) pending = { c: hover.c, r: hover.r };
   if (role === 'solo') return;
   if (role === 'host') { const me = players.find(p => p.id === 0); if (me) { me.x = hover.x; me.y = hover.y; } }
   else if (hostConn && hostConn.open && performance.now() - curAt > 100) { curAt = performance.now(); hostConn.send({ t: 'cur', x: Math.round(hover.x), y: Math.round(hover.y) }); }
@@ -1204,8 +1212,19 @@ canvas.addEventListener('pointerdown', ev => {
   if (state.phase === 'over' || menuOpen && role !== 'guest') return;
   if (armedAb === 'air') { armedAb = null; sendCmd({ k: 'air', x: Math.round(p.x), y: Math.round(p.y) }); return; }
   const t = towerAt(p.c, p.r);
-  if (t) { selected = t; armed = null; selKey = ''; setHint(`${TOWERS[t.type].name}　Lv ${t.lvl}。可在右側升級、出售或切換目標。`); refreshAll(); return; }
+  if (t) { selected = t; armed = null; pending = null; selKey = ''; setHint(`${TOWERS[t.type].name}　Lv ${t.lvl}。可在下方面板升級、出售或切換目標。`); refreshAll();
+    try { if (window.matchMedia && window.matchMedia('(max-width:860px)').matches) $('selPanel').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    return; }
   if (armed) {
+    if (ev.pointerType !== 'mouse') {
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+      if (!(pending && pending.c === p.c && pending.r === p.r)) {
+        pending = { c: p.c, r: p.r };
+        setHint(canPlace(p.c, p.r) ? '可拖曳微調位置，再點一次同一格確認建造。' : '這格不能建造，請換一格。');
+        return;
+      }
+      pending = null;
+    }
     const d = TOWERS[armed];
     if (!canPlace(p.c, p.r)) { setHint('這格不能建造：航道、燈塔或已有砲塔。'); return; }
     if (state.gold < d.cost) { setHint(`金幣不足，${d.name}需要 ${d.cost}。`); return; }
@@ -1266,7 +1285,7 @@ document.addEventListener('keydown', ev => {
   if (ev.target && ev.target.tagName === 'INPUT') return;
   const k = ev.key;
   if (k >= '1' && k <= '6') { arm(TK[+k - 1]); return; }
-  if (k === 'Escape') { armed = null; armedAb = null; selected = null; selKey = ''; refreshAll(); return; }
+  if (k === 'Escape') { armed = null; armedAb = null; pending = null; selected = null; selKey = ''; refreshAll(); return; }
   if (k === ' ') {
     if (ev.target.closest && ev.target.closest('button')) return;
     ev.preventDefault();
