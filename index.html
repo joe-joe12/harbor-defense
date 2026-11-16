@@ -21,6 +21,7 @@
 }
 *{box-sizing:border-box}
 body{margin:0}
+[hidden]{display:none!important}
 body{
   background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
   padding-block:16px;
@@ -40,8 +41,8 @@ h1{font-family:var(--font-num);font-size:30px;letter-spacing:.12em;margin:0;font
 .stage{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#10262d}
 canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;cursor:crosshair;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .hint{margin:0;color:var(--muted);font-size:13px;min-height:20px}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,20,25,.8);padding:16px}
-.ocard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 24px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:10px;text-align:center}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,20,25,.82);padding:16px;overflow:auto}
+.ocard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 24px;max-width:360px;width:100%;display:flex;flex-direction:column;gap:10px;text-align:center;margin:auto}
 .ocard h2{margin:0;font-size:26px;letter-spacing:.1em}
 .ocard p{margin:0}
 .dock{display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -51,11 +52,17 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:16/10;cursor:crosshair;
 button{font:inherit;color:var(--fg);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;min-height:44px;padding:8px 12px;cursor:pointer;transition:background .15s,border-color .15s}
 button:hover:not(:disabled){background:#21444f;border-color:#3b6372}
 button:disabled{opacity:.45;cursor:not-allowed}
-button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
 .primary{background:var(--amber);color:#1a1405;border-color:var(--amber);font-weight:700;font-size:16px;width:100%}
 .primary:hover:not(:disabled){background:#ffc65a;border-color:#ffc65a}
+input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--line);border-radius:6px;min-height:44px;padding:8px 12px;min-width:0;width:100%}
+#codeIn{text-transform:uppercase;letter-spacing:.2em;text-align:center;font-family:var(--font-num);font-size:20px}
 .row{display:flex;gap:8px}
 .row>*{flex:1;min-width:0}
+.row>.narrow{flex:0 0 96px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:6px 8px;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--amber);color:#1a1405;border-color:var(--amber);font-weight:700}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
@@ -63,8 +70,11 @@ button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
 .tw{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border-left:4px solid var(--c);padding:8px 10px;min-height:76px}
 .tw b{font-size:15px}
 .tw small{color:var(--muted);font-size:12px;line-height:1.35}
-.tw[aria-pressed="true"]{background:#264b58;border-color:var(--c)}
+.tw[aria-pressed="true"],.ab[aria-pressed="true"]{background:#264b58;border-color:var(--c,var(--amber))}
 .tw.poor .coin{color:var(--danger)}
+.abs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ab{display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;border-left:4px solid var(--c);padding:6px 10px;min-height:56px}
+.ab small{color:var(--muted);font-size:12px}
 .coin{font-family:var(--font-num);font-size:16px;font-weight:600;color:var(--amber);display:inline-flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
 .coin::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;display:inline-block}
 .sel-head{display:flex;align-items:center;gap:8px}
@@ -74,6 +84,8 @@ button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
 .kv dt{font-size:11px;color:var(--muted)}
 .kv dd{margin:0;font-family:var(--font-num);font-size:18px;font-variant-numeric:tabular-nums}
 .muted{color:var(--muted);margin:0;font-size:13px}
+.plrow{display:flex;align-items:center;gap:8px;padding:2px 0}
+.big{font-family:var(--font-num);font-size:44px;letter-spacing:.3em;color:var(--amber);line-height:1;padding-left:.3em}
 @media (max-width:860px){
   .main{grid-template-columns:minmax(0,1fr)}
   h1{font-size:26px}
@@ -97,12 +109,54 @@ button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
     <div class="stagecol">
       <section class="stage">
         <canvas id="cv" aria-label="塔防戰場"></canvas>
+
+        <div class="overlay" id="menu">
+          <div class="ocard">
+            <h2>港口防線</h2>
+            <p class="muted">守住燈塔，撐過 20 波敵艦。可以單人玩，也能和朋友連線合作。</p>
+            <div class="seg" id="diffSeg" role="group" aria-label="難度">
+              <button type="button" data-d="easy" aria-pressed="false">簡單</button>
+              <button type="button" data-d="normal" aria-pressed="true">普通</button>
+              <button type="button" data-d="hard" aria-pressed="false">困難</button>
+            </div>
+            <button class="primary" id="soloBtn" type="button">單人遊戲</button>
+            <button id="hostBtn" type="button">建立連線房間</button>
+            <div class="row">
+              <input id="codeIn" maxlength="5" placeholder="房間代碼" autocomplete="off" aria-label="房間代碼">
+              <button class="narrow" id="joinBtn" type="button">加入</button>
+            </div>
+            <p class="muted" id="menuMsg"></p>
+          </div>
+        </div>
+
+        <div class="overlay" id="lobby" hidden>
+          <div class="ocard">
+            <h2>房間已建立</h2>
+            <p class="muted">把代碼或連結傳給朋友，最多 4 人一起守港。</p>
+            <div class="big" id="lobbyCode">-----</div>
+            <input id="lobbyLink" readonly aria-label="邀請連結">
+            <button id="lobbyCopy" type="button">複製邀請連結</button>
+            <div id="lobbyList" style="text-align:left"></div>
+            <button class="primary" id="lobbyGo" type="button">開始布陣</button>
+          </div>
+        </div>
+
         <div class="overlay" id="overlay" hidden>
           <div class="ocard">
             <h2 id="oTitle"></h2>
             <p id="oText"></p>
             <p class="muted" id="oBest"></p>
+            <button class="primary" id="contBtn" type="button">繼續挑戰無盡模式</button>
             <button class="primary" id="againBtn" type="button">再玩一次</button>
+            <p class="muted" id="oWait" hidden>等待房主操作…</p>
+          </div>
+        </div>
+
+        <div class="overlay" id="disc" hidden>
+          <div class="ocard">
+            <h2>與房主斷線</h2>
+            <p class="muted">連線已中斷，可以回到主選單重新加入。</p>
+            <button class="primary" id="reloadBtn" type="button">回到主選單</button>
           </div>
         </div>
       </section>
@@ -116,23 +170,39 @@ button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
         <div class="row">
           <button id="pauseBtn" type="button">暫停</button>
           <button id="speedBtn" type="button">速度 ×1</button>
+          <button id="muteBtn" type="button">音效 開</button>
         </div>
         <div class="muted" id="previewLabel"></div>
         <div class="chips" id="preview"></div>
       </div>
       <div class="panel">
-        <h2>建造 <span class="kbd">快捷鍵 1–4</span></h2>
+        <h2>技能 <span class="kbd">A 空襲　Z 凍結</span></h2>
+        <div class="abs">
+          <button class="ab" id="abAir" type="button" style="--c:#ff7b7b"><b>空襲</b><small id="abAirT">就緒</small></button>
+          <button class="ab" id="abFreeze" type="button" style="--c:#7fd8f0"><b>凍結</b><small id="abFreezeT">就緒</small></button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>建造 <span class="kbd">快捷鍵 1–6</span></h2>
         <div class="shop" id="shop"></div>
       </div>
       <div class="panel" id="selPanel"></div>
+      <div class="panel" id="plPanel" hidden>
+        <h2>玩家 <span class="kbd" id="plCount"></span></h2>
+        <div id="plList"></div>
+        <input id="inviteIn" readonly aria-label="邀請連結">
+        <button id="inviteBtn" type="button">複製邀請連結</button>
+      </div>
     </aside>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (() => {
 'use strict';
-const W = 960, H = 600, C = 60, COLS = 16, ROWS = 10, MAX_WAVE = 20, KEY = 'harbor-defense-best';
+const W = 960, H = 600, C = 60, COLS = 16, ROWS = 10, MAX_WAVE = 20, MAX_PLAYERS = 4;
+const KEY = 'harbor-defense-best', MUTE_KEY = 'harbor-defense-mute';
 const $ = id => document.getElementById(id);
 const canvas = $('cv'), ctx = canvas.getContext('2d');
 const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -152,7 +222,7 @@ for (let i = 0; i < pts.length - 1; i++) {
 function posAt(d) {
   for (const s of segs) {
     if (d <= s.start + s.len) {
-      const t = (d - s.start) / s.len;
+      const t = Math.max(0, (d - s.start) / s.len);
       return { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t, ang: s.ang };
     }
   }
@@ -173,28 +243,56 @@ blocked[7][15] = true; // 燈塔
 
 /* ---------- 資料 ---------- */
 const TOWERS = {
-  gun:    { name: '機槍塔', cost: 60,  range: 130, rate: 0.28, dmg: 9,   color: '#f2b441', desc: '射速快，穩定輸出' },
-  cannon: { name: '加農砲', cost: 120, range: 150, rate: 1.4,  dmg: 36,  splash: 58, color: '#e8744f', desc: '爆炸範圍傷害，剋制群體' },
-  frost:  { name: '冰霜塔', cost: 90,  range: 115, rate: 1.1,  dmg: 5,   slow: 0.45, color: '#7fd8f0', desc: '範圍減速並造成輕傷' },
-  sniper: { name: '狙擊塔', cost: 160, range: 270, rate: 2.2,  dmg: 110, color: '#b9e36a', desc: '超遠射程，單發重傷' }
+  gun:     { name: '機槍塔', cost: 60,  range: 130, rate: 0.28, dmg: 9,   color: '#f2b441', desc: '射速快，穩定輸出' },
+  cannon:  { name: '加農砲', cost: 120, range: 150, rate: 1.4,  dmg: 36,  splash: 58, color: '#e8744f', desc: '爆炸範圍傷害，剋制群體' },
+  frost:   { name: '冰霜塔', cost: 90,  range: 115, rate: 1.1,  dmg: 5,   slow: 0.45, color: '#7fd8f0', desc: '範圍減速並造成輕傷' },
+  sniper:  { name: '狙擊塔', cost: 160, range: 270, rate: 2.2,  dmg: 110, color: '#b9e36a', desc: '超遠射程，單發重傷' },
+  arc:     { name: '電弧塔', cost: 140, range: 140, rate: 1.0,  dmg: 28,  chain: 3, color: '#c79bff', desc: '閃電連鎖，同時打多艘' },
+  support: { name: '增幅塔', cost: 110, range: 110, rate: 99,   dmg: 0,   color: '#5eead4', desc: '提升範圍內砲塔的傷害' }
 };
+const TK = Object.keys(TOWERS);
+const SUP = [0.2, 0.32, 0.45];
 const ENEMIES = {
-  swift:  { name: '小艇',   hp: 38,   speed: 78, reward: 5,   size: 8,  armor: 0, dmg: 1, color: '#ff9a8a' },
-  patrol: { name: '巡邏艦', hp: 105,  speed: 52, reward: 9,   size: 11, armor: 0, dmg: 1, color: '#e0525e' },
-  armor:  { name: '裝甲艦', hp: 360,  speed: 34, reward: 20,  size: 14, armor: 3, dmg: 2, color: '#9a6bb5' },
-  boss:   { name: '旗艦',   hp: 2600, speed: 26, reward: 160, size: 20, armor: 5, dmg: 6, color: '#c93b4a' }
+  swift:    { name: '小艇',   hp: 38,   speed: 78, reward: 5,   size: 8,  armor: 0, dmg: 1, color: '#ff9a8a' },
+  patrol:   { name: '巡邏艦', hp: 105,  speed: 52, reward: 9,   size: 11, armor: 0, dmg: 1, color: '#e0525e' },
+  armor:    { name: '裝甲艦', hp: 360,  speed: 34, reward: 20,  size: 14, armor: 3, dmg: 2, color: '#9a6bb5' },
+  healer:   { name: '補給艦', hp: 150,  speed: 46, reward: 14,  size: 12, armor: 0, dmg: 1, color: '#5fd0a0' },
+  splitter: { name: '母艦',   hp: 320,  speed: 38, reward: 18,  size: 15, armor: 1, dmg: 2, color: '#d08a3c' },
+  boss:     { name: '旗艦',   hp: 2600, speed: 26, reward: 160, size: 20, armor: 5, dmg: 6, color: '#c93b4a' }
 };
+const EK = Object.keys(ENEMIES);
+const DIFF = { easy: { hp: 0.75, gold: 240, lives: 25 }, normal: { hp: 1, gold: 180, lives: 20 }, hard: { hp: 1.35, gold: 150, lives: 12 } };
+const AB = { air: { cd: 40 }, freeze: { cd: 60 } };
 const MODES = { first: '最前方', strong: '最強', close: '最近' };
 const MODE_ORDER = ['first', 'strong', 'close'];
+const PH = ['idle', 'running', 'over'];
+const PCOL = ['#f2b441', '#7fd8f0', '#ff8fb1', '#b9e36a'];
 
+let state, towers, enemies, projs, fx, parts, floats, queue, spawnT, strikes;
+let armed = null, armedAb = null, selected = null, hover = null, kills = 0, best = 0, time = 0, tid = 0, eid = 0;
+let role = 'solo', peer = null, hostConn = null, players = [], myId = 0, outbox = [], menuOpen = true;
+let emap = new Map(), roomCode = '', diffPick = 'normal', muted = false;
+try { best = +localStorage.getItem(KEY) || 0; muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+
+function buffAt(t) {
+  let b = 0;
+  for (const s of towers) {
+    if (s.type !== 'support' || s === t) continue;
+    const r = TOWERS.support.range * (1 + 0.08 * (s.lvl - 1));
+    if (Math.hypot(s.x - t.x, s.y - t.y) <= r) b += SUP[s.lvl - 1];
+  }
+  return Math.min(0.9, b);
+}
 function stats(t) {
   const d = TOWERS[t.type], l = t.lvl;
   return {
     range: d.range * (1 + 0.08 * (l - 1)),
     rate: d.rate * Math.pow(0.88, l - 1),
-    dmg: d.dmg * [1, 1.7, 2.6][l - 1],
+    dmg: d.dmg * [1, 1.7, 2.6][l - 1] * (t.type === 'support' ? 1 : 1 + buffAt(t)),
     splash: d.splash ? d.splash * (1 + 0.1 * (l - 1)) : 0,
-    slow: d.slow ? Math.min(0.7, d.slow + 0.1 * (l - 1)) : 0
+    slow: d.slow ? Math.min(0.7, d.slow + 0.1 * (l - 1)) : 0,
+    chain: d.chain ? d.chain + l - 1 : 0,
+    buff: t.type === 'support' ? SUP[l - 1] : 0
   };
 }
 const upCost = t => t.lvl >= 3 ? null : Math.round(TOWERS[t.type].cost * (t.lvl === 1 ? 0.8 : 1.2));
@@ -204,9 +302,11 @@ const hpMult = n => 1 + 0.2 * (n - 1) + 0.012 * (n - 1) * (n - 1);
 function waveGroups(n) {
   const g = [];
   g.push({ t: 'swift', c: n <= 12 ? 6 + n * 2 : 8, gap: Math.max(0.28, 0.7 - n * 0.02) });
-  if (n >= 3) g.push({ t: 'patrol', c: 2 + Math.floor((n - 2) * 1.3), gap: Math.max(0.55, 1.1 - n * 0.03) });
-  if (n >= 6) g.push({ t: 'armor', c: Math.floor((n - 4) * 0.9), gap: Math.max(0.9, 1.6 - n * 0.03) });
-  if (n % 10 === 0) g.push({ t: 'boss', c: n / 10, gap: 3 });
+  if (n >= 3) g.push({ t: 'patrol', c: Math.min(60, 2 + Math.floor((n - 2) * 1.3)), gap: Math.max(0.4, 1.1 - n * 0.03) });
+  if (n >= 6) g.push({ t: 'armor', c: Math.min(45, Math.floor((n - 4) * 0.9)), gap: Math.max(0.6, 1.6 - n * 0.03) });
+  if (n >= 8) g.push({ t: 'healer', c: Math.min(14, Math.floor((n - 5) / 3)), gap: 1.4 });
+  if (n >= 12) g.push({ t: 'splitter', c: Math.min(16, Math.floor((n - 9) / 3)), gap: 1.8 });
+  if (n % 10 === 0) g.push({ t: 'boss', c: Math.min(6, n / 10), gap: 3 });
   return g;
 }
 function buildQueue(n) {
@@ -220,17 +320,69 @@ function buildQueue(n) {
   return items;
 }
 
-/* ---------- 狀態 ---------- */
-let state, towers, enemies, projs, fx, parts, floats, queue, spawnT, armed, selected, hover, kills, best = 0, time = 0;
-try { best = +localStorage.getItem(KEY) || 0; } catch (e) {}
+/* ---------- 音效 ---------- */
+let AC = null; const lastS = {};
+function ensureAC() {
+  if (!AC) { const A = window.AudioContext || window.webkitAudioContext; if (A) { try { AC = new A(); } catch (e) {} } }
+  if (AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) {} }
+}
+function tone(f1, f2, dur, type, vol) {
+  const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const SND = {
+  gun: [520, 300, 0.05, 'square', 0.025, 0.06], cannon: [150, 60, 0.18, 'sawtooth', 0.07, 0.12],
+  zap: [900, 200, 0.12, 'sawtooth', 0.035, 0.07], frost: [700, 1100, 0.2, 'sine', 0.05, 0.2],
+  snipe: [1200, 200, 0.15, 'square', 0.045, 0.1], boom: [110, 40, 0.25, 'triangle', 0.09, 0.06],
+  build: [440, 660, 0.1, 'sine', 0.07, 0.05], up: [523, 880, 0.18, 'sine', 0.07, 0.05],
+  sell: [660, 330, 0.12, 'sine', 0.06, 0.05], leak: [220, 90, 0.35, 'sawtooth', 0.09, 0.2],
+  wave: [330, 660, 0.3, 'triangle', 0.08, 0.5], win: [440, 1320, 0.7, 'sine', 0.08, 1], lose: [300, 60, 0.9, 'sawtooth', 0.08, 1],
+  air: [800, 80, 0.5, 'sawtooth', 0.06, 0.3], freezeAll: [1400, 300, 0.6, 'sine', 0.07, 0.5]
+};
+function sfx(n) {
+  if (muted || !AC || !SND[n]) return;
+  const s = SND[n];
+  if (time - (lastS[n] || -9) < s[5]) return;
+  lastS[n] = time;
+  try { tone(s[0], s[1], s[2], s[3], s[4]); } catch (e) {}
+}
 
-function reset() {
-  state = { gold: 180, lives: 20, wave: 0, phase: 'idle', speed: 1, paused: false, flash: 0 };
-  towers = []; enemies = []; projs = []; fx = []; parts = []; floats = [];
-  queue = []; spawnT = 0; armed = null; selected = null; hover = null; kills = 0;
+/* ---------- 事件（房主發出，玩家同步重播） ---------- */
+function emit(ev) { applyEvent(ev); if (role === 'host') outbox.push(ev); }
+function emitG(ev) { if (role === 'host') outbox.push(ev); }
+function applyEvent(ev) {
+  switch (ev.e) {
+    case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, max: ev.max, life: ev.life, t: ev.life, color: ev.color }); break;
+    case 'warn': fx.push({ k: 'warn', x: ev.x, y: ev.y, max: ev.max, life: ev.life, t: ev.life, color: ev.color }); break;
+    case 'line': fx.push({ k: 'line', x1: ev.x1, y1: ev.y1, x2: ev.x2, y2: ev.y2, life: ev.life, t: ev.life, color: ev.color }); break;
+    case 'burst': burst(ev.x, ev.y, ev.color, ev.n, ev.sp); break;
+    case 'float': floats.push({ x: ev.x, y: ev.y, text: ev.text, life: ev.life, max: ev.life, color: ev.color, big: !!ev.big }); break;
+    case 'sfx': break;
+    case 'proj':
+      if (role === 'guest') {
+        projs.push({ x: ev.x, y: ev.y, tgt: emap.get(ev.tg) || null, tx: ev.tx, ty: ev.ty, sp: ev.sp, kind: ev.k, color: ev.color, ang: ev.ang, splash: ev.splash, vis: true });
+        sfx(ev.k === 'bullet' ? 'gun' : 'cannon');
+      }
+      break;
+  }
+  if (ev.s) sfx(ev.s);
+}
+function burst(x, y, color, n, sp) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, v = sp * (0.3 + Math.random() * 0.7);
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.3, max: 0.8, color, size: 1.5 + Math.random() * 2 });
+  }
+}
+
+/* ---------- 狀態 ---------- */
+function reset(diff) {
+  const dk = diff || (state && state.diff) || 'normal', d = DIFF[dk];
+  state = { gold: d.gold, lives: d.lives, wave: 0, phase: 'idle', speed: 1, paused: false, flash: 0, diff: dk, endless: false, win: false, cd: { air: 0, freeze: 0 } };
+  towers = []; enemies = []; projs = []; fx = []; parts = []; floats = []; strikes = [];
+  queue = []; spawnT = 0; armed = null; armedAb = null; selected = null; kills = 0; emap = new Map(); outbox = [];
   $('overlay').hidden = true;
-  $('pauseBtn').textContent = '暫停';
-  $('speedBtn').textContent = '速度 ×1';
   setHint('從右側選一座砲塔，再點地圖上的空地建造。準備好就按「開始」。');
   refreshAll();
 }
@@ -265,11 +417,9 @@ function drawBG() {
   g.strokeStyle = '#0c2b36'; g.lineWidth = 52; g.stroke();
   g.strokeStyle = '#1d6177'; g.lineWidth = 44; g.stroke();
   g.strokeStyle = '#23778f'; g.lineWidth = 26; g.stroke();
-  // 碼頭
   g.fillStyle = '#6b583b'; g.fillRect(920, 8 * C + 24, 40, 12);
   g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
   for (let x = 926; x < 960; x += 8) { g.beginPath(); g.moveTo(x, 8 * C + 24); g.lineTo(x, 8 * C + 36); g.stroke(); }
-  // 燈塔
   const lx = 15 * C + C / 2, ly = 7 * C + C / 2;
   const glow = g.createRadialGradient(lx, ly - 18, 2, lx, ly - 18, 34);
   glow.addColorStop(0, 'rgba(242,180,65,.4)'); glow.addColorStop(1, 'rgba(242,180,65,0)');
@@ -279,10 +429,9 @@ function drawBG() {
   g.fillStyle = '#d9534f'; g.fillRect(lx - 7.5, ly + 1, 15, 8);
   g.fillStyle = '#f2b441'; g.fillRect(lx - 6, ly - 22, 12, 8);
   g.fillStyle = '#d9534f'; g.beginPath(); g.moveTo(lx - 8, ly - 22); g.lineTo(lx, ly - 30); g.lineTo(lx + 8, ly - 22); g.closePath(); g.fill();
-  // 標示
   g.font = '600 12px "Noto Sans TC",sans-serif';
   g.fillStyle = 'rgba(230,240,242,.6)';
-  g.fillText('敵艦入口', 8, 2 * C + 12 - 36);
+  g.fillText('敵艦入口', 8, 2 * C - 24);
   g.fillText('港口', 15 * C + 14, 8 * C + 52);
   g.fillStyle = 'rgba(255,123,123,.8)';
   g.beginPath(); g.moveTo(8, 2 * C + 22); g.lineTo(20, 2 * C + 30); g.lineTo(8, 2 * C + 38); g.closePath(); g.fill();
@@ -290,58 +439,101 @@ function drawBG() {
 drawBG();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawBG);
 
-/* ---------- 建造 / 升級 / 出售 ---------- */
+/* ---------- 指令（房主／單人直接執行；玩家送給房主） ---------- */
 const towerAt = (c, r) => towers.find(t => t.c === c && t.r === r);
+const towerById = id => towers.find(t => t.id === id);
 const canPlace = (c, r) => c >= 0 && c < COLS && r >= 0 && r < ROWS && !blocked[r][c] && !towerAt(c, r);
+const fail = msg => ({ ok: false, msg });
 
-function place(c, r) {
-  const d = TOWERS[armed];
-  if (!canPlace(c, r)) { setHint('這格不能建造：航道、燈塔或已有砲塔。'); return; }
-  if (state.gold < d.cost) { setHint(`金幣不足，${d.name}需要 ${d.cost}。`); return; }
-  state.gold -= d.cost;
-  const t = { type: armed, c, r, x: c * C + C / 2, y: r * C + C / 2, lvl: 1, cd: 0.2, ang: -Math.PI / 2, spent: d.cost, mode: armed === 'sniper' ? 'strong' : 'first', recoil: 0 };
-  towers.push(t);
-  burst(t.x, t.y, d.color, 10, 70);
-  setHint(`已建造${d.name}。再次點擊空地可繼續建造，Esc 或右鍵取消。`);
+function execCmd(c, from) {
+  if (state.phase === 'over' && c.k !== 'noop') return fail('遊戲已結束。');
+  switch (c.k) {
+    case 'place': {
+      const d = TOWERS[c.type];
+      if (!d) return fail('未知的砲塔。');
+      if (!canPlace(c.c, c.r)) return fail('這格不能建造：航道、燈塔或已有砲塔。');
+      if (state.gold < d.cost) return fail(`金幣不足，${d.name}需要 ${d.cost}。`);
+      state.gold -= d.cost;
+      const t = { id: ++tid, type: c.type, c: c.c, r: c.r, x: c.c * C + C / 2, y: c.r * C + C / 2, lvl: 1, cd: 0.2, ang: -Math.PI / 2, spent: d.cost, mode: c.type === 'sniper' ? 'strong' : 'first', recoil: 0, owner: from };
+      towers.push(t);
+      emit({ e: 'burst', x: t.x, y: t.y, color: d.color, n: 10, sp: 70, s: 'build' });
+      return { ok: true, msg: `已建造${d.name}。再次點擊空地可繼續建造，Esc 或右鍵取消。` };
+    }
+    case 'up': {
+      const t = towerById(c.id); if (!t) return fail('找不到這座砲塔。');
+      const cost = upCost(t);
+      if (cost == null) return fail('已經是最高等級。');
+      if (state.gold < cost) return fail(`金幣不足，升級需要 ${cost}。`);
+      state.gold -= cost; t.spent += cost; t.lvl++;
+      emit({ e: 'burst', x: t.x, y: t.y, color: TOWERS[t.type].color, n: 14, sp: 90, s: 'up' });
+      emit({ e: 'float', x: t.x, y: t.y - 26, text: `Lv ${t.lvl}`, life: 0.9, color: '#f2b441' });
+      return { ok: true };
+    }
+    case 'sell': {
+      const t = towerById(c.id); if (!t) return fail('找不到這座砲塔。');
+      if (t.owner !== from && from !== 0) return fail('只有建造者或房主能出售這座砲塔。');
+      const v = sellValue(t);
+      state.gold += v;
+      towers = towers.filter(x => x !== t);
+      if (selected === t) selected = null;
+      emit({ e: 'float', x: t.x, y: t.y - 10, text: `+${v}`, life: 0.9, color: '#f2b441' });
+      emit({ e: 'burst', x: t.x, y: t.y, color: '#8fb0ba', n: 8, sp: 60, s: 'sell' });
+      return { ok: true, msg: `已出售，取回 ${v} 金幣。` };
+    }
+    case 'mode': {
+      const t = towerById(c.id); if (!t || MODE_ORDER.indexOf(c.m) < 0) return fail('');
+      t.mode = c.m; return { ok: true };
+    }
+    case 'start': return startWave();
+    case 'air': return useAir(c.x, c.y);
+    case 'freeze': return useFreeze();
+  }
+  return fail('');
+}
+function startWave() {
+  if (menuOpen && role === 'host') return fail('房主還在準備中。');
+  if (state.phase !== 'idle') return fail('');
+  state.wave++;
+  queue = buildQueue(state.wave);
+  spawnT = 0.4;
+  state.phase = 'running';
+  emit({ e: 'sfx', s: 'wave' });
+  return { ok: true, msg: `第 ${state.wave} 波來襲。` };
+}
+function useAir(x, y) {
+  if (state.cd.air > 0) return fail('空襲還在冷卻。');
+  if (!(x >= 0 && x <= W && y >= 0 && y <= H)) return fail('');
+  state.cd.air = AB.air.cd;
+  const dmg = 120 + state.wave * 14;
+  for (let i = 0; i < 7; i++) {
+    const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 80;
+    strikes.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, t: 0.8 + i * 0.12, dmg });
+  }
+  emit({ e: 'warn', x, y, max: 92, life: 0.9, color: '#ff7b7b' });
+  return { ok: true, msg: '空襲出動。' };
+}
+function useFreeze() {
+  if (state.cd.freeze > 0) return fail('凍結還在冷卻。');
+  state.cd.freeze = AB.freeze.cd;
+  for (const e of enemies) { if (!e.alive) continue; e.slow = Math.max(e.slowT > 0 ? e.slow : 0, 0.9); e.slowT = Math.max(e.slowT, 3); }
+  emit({ e: 'ring', x: W / 2, y: H / 2, max: 700, life: 0.8, color: '#7fd8f0', s: 'freezeAll' });
+  return { ok: true, msg: '全場敵艦被凍結 3 秒。' };
+}
+function sendCmd(c) {
+  if (role === 'guest') { if (hostConn && hostConn.open) hostConn.send({ t: 'cmd', c }); return; }
+  const r = execCmd(c, myId);
+  if (r && r.msg) setHint(r.msg);
   refreshAll();
 }
-function upgrade() {
-  const t = selected; if (!t || state.phase === 'over') return;
-  const c = upCost(t);
-  if (c == null) { setHint('已經是最高等級。'); return; }
-  if (state.gold < c) { setHint(`金幣不足，升級需要 ${c}。`); return; }
-  state.gold -= c; t.spent += c; t.lvl++;
-  burst(t.x, t.y, TOWERS[t.type].color, 14, 90);
-  floats.push({ x: t.x, y: t.y - 26, text: `Lv ${t.lvl}`, life: 0.9, max: 0.9, color: '#f2b441' });
-  refreshAll();
-}
-function sell() {
-  const t = selected; if (!t || state.phase === 'over') return;
-  const v = sellValue(t);
-  state.gold += v;
-  towers = towers.filter(x => x !== t);
-  floats.push({ x: t.x, y: t.y - 10, text: `+${v}`, life: 0.9, max: 0.9, color: '#f2b441' });
-  burst(t.x, t.y, '#8fb0ba', 8, 60);
-  selected = null;
-  setHint(`已出售，取回 ${v} 金幣。`);
-  refreshAll();
-}
-function arm(type) {
-  if (state.phase === 'over') return;
-  armed = armed === type ? null : type;
-  selected = null;
-  if (armed) setHint(`${TOWERS[armed].name}：${TOWERS[armed].desc}。點擊地圖空地放置。`);
-  refreshAll();
-}
-function disarm() { armed = null; refreshAll(); }
 
 /* ---------- 戰鬥 ---------- */
-let eid = 0;
-function spawn(type) {
+function spawnEnemy(type, dist) {
   const d = ENEMIES[type], n = state.wave;
-  const hp = Math.round(d.hp * hpMult(n));
-  const p = posAt(0);
-  enemies.push({ id: eid++, type, def: d, hp, max: hp, dist: 0, x: p.x, y: p.y, ang: p.ang, slow: 0, slowT: 0, alive: true, reward: Math.round(d.reward * (1 + 0.04 * (n - 1))) });
+  const hp = Math.max(1, Math.round(d.hp * hpMult(n) * DIFF[state.diff].hp));
+  const p = posAt(dist);
+  const e = { id: ++eid, type, def: d, hp, max: hp, dist, x: p.x, y: p.y, ang: p.ang, slow: 0, slowT: 0, alive: true, reward: Math.round(d.reward * (1 + 0.04 * (n - 1))) };
+  enemies.push(e);
+  return e;
 }
 function damage(e, amt) {
   if (!e.alive) return;
@@ -349,27 +541,27 @@ function damage(e, amt) {
   if (e.hp <= 0) {
     e.alive = false; kills++;
     state.gold += e.reward;
-    floats.push({ x: e.x, y: e.y - 8, text: `+${e.reward}`, life: 0.8, max: 0.8, color: '#f2b441' });
-    burst(e.x, e.y, e.def.color, e.type === 'boss' ? 28 : 8, e.type === 'boss' ? 160 : 80);
+    emit({ e: 'float', x: e.x, y: e.y - 8, text: `+${e.reward}`, life: 0.8, color: '#f2b441' });
+    emit({ e: 'burst', x: e.x, y: e.y, color: e.def.color, n: e.type === 'boss' ? 28 : 8, sp: e.type === 'boss' ? 160 : 80 });
+    if (e.type === 'splitter') { spawnEnemy('swift', Math.max(0, e.dist - 6)); spawnEnemy('swift', Math.max(0, e.dist - 22)); }
     updateStats();
   }
 }
-function burst(x, y, color, n, sp) {
-  for (let i = 0; i < n; i++) {
-    const a = Math.random() * 6.283, v = sp * (0.3 + Math.random() * 0.7);
-    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.3, max: 0.8, color, size: 1.5 + Math.random() * 2 });
-  }
-}
 function pickTarget(t, range) {
-  let best = null, bv = -Infinity;
+  let bestE = null, bv = -Infinity;
   for (const e of enemies) {
     if (!e.alive) continue;
     const d = Math.hypot(e.x - t.x, e.y - t.y);
     if (d > range + e.def.size * 0.5) continue;
     const v = t.mode === 'first' ? e.dist : t.mode === 'strong' ? e.hp : -d;
-    if (v > bv) { bv = v; best = e; }
+    if (v > bv) { bv = v; bestE = e; }
   }
-  return best;
+  return bestE;
+}
+function shoot(p) {
+  projs.push(p);
+  emitG({ e: 'proj', x: Math.round(p.x), y: Math.round(p.y), tg: p.tgt ? p.tgt.id : 0, tx: Math.round(p.tx), ty: Math.round(p.ty), sp: p.sp, k: p.kind, color: p.color, ang: +p.ang.toFixed(2), splash: Math.round(p.splash || 0) });
+  sfx(p.kind === 'bullet' ? 'gun' : 'cannon');
 }
 function fire(t, s, e) {
   t.ang = Math.atan2(e.y - t.y, e.x - t.x);
@@ -377,70 +569,107 @@ function fire(t, s, e) {
   const col = TOWERS[t.type].color;
   const mx = t.x + Math.cos(t.ang) * 20, my = t.y + Math.sin(t.ang) * 20;
   if (t.type === 'gun') {
-    projs.push({ x: mx, y: my, tgt: e, tx: e.x, ty: e.y, sp: 560, dmg: s.dmg, kind: 'bullet', color: col, ang: t.ang });
+    shoot({ x: mx, y: my, tgt: e, tx: e.x, ty: e.y, sp: 560, dmg: s.dmg, kind: 'bullet', color: col, ang: t.ang });
   } else if (t.type === 'cannon') {
-    projs.push({ x: mx, y: my, tgt: e, tx: e.x, ty: e.y, sp: 300, dmg: s.dmg, splash: s.splash, kind: 'shell', color: col, ang: t.ang });
+    shoot({ x: mx, y: my, tgt: e, tx: e.x, ty: e.y, sp: 300, dmg: s.dmg, splash: s.splash, kind: 'shell', color: col, ang: t.ang });
   } else if (t.type === 'frost') {
-    fx.push({ k: 'ring', x: t.x, y: t.y, max: s.range, life: 0.5, t: 0.5, color: col });
-    for (const q of enemies) {
+    emit({ e: 'ring', x: t.x, y: t.y, max: Math.round(s.range), life: 0.5, color: col, s: 'frost' });
+    for (const q of enemies.slice()) {
       if (!q.alive || Math.hypot(q.x - t.x, q.y - t.y) > s.range) continue;
       if (q.slowT <= 0 || s.slow >= q.slow) q.slow = s.slow;
       q.slowT = Math.max(q.slowT, 1.6);
       damage(q, s.dmg);
     }
   } else if (t.type === 'sniper') {
-    fx.push({ k: 'line', x1: mx, y1: my, x2: e.x, y2: e.y, life: 0.16, t: 0.16, color: col });
-    burst(e.x, e.y, col, 6, 70);
+    emit({ e: 'line', x1: Math.round(mx), y1: Math.round(my), x2: Math.round(e.x), y2: Math.round(e.y), life: 0.16, color: col, s: 'snipe' });
+    emit({ e: 'burst', x: e.x, y: e.y, color: col, n: 6, sp: 70 });
     damage(e, s.dmg);
+  } else if (t.type === 'arc') {
+    const hit = new Set(); let from = { x: mx, y: my }, target = e, dmg = s.dmg;
+    for (let i = 0; i < s.chain && target; i++) {
+      hit.add(target);
+      emit({ e: 'line', x1: Math.round(from.x), y1: Math.round(from.y), x2: Math.round(target.x), y2: Math.round(target.y), life: 0.2, color: col, s: i ? '' : 'zap' });
+      from = { x: target.x, y: target.y };
+      damage(target, dmg); dmg *= 0.8;
+      let nx = null, nd = 1e9;
+      for (const q of enemies) {
+        if (!q.alive || hit.has(q)) continue;
+        const d = Math.hypot(q.x - from.x, q.y - from.y);
+        if (d <= 95 && d < nd) { nd = d; nx = q; }
+      }
+      target = nx;
+    }
   }
 }
 function impact(p) {
   if (p.kind === 'bullet') {
-    if (p.tgt && p.tgt.alive) damage(p.tgt, p.dmg);
+    if (!p.vis && p.tgt && p.tgt.alive) damage(p.tgt, p.dmg);
     burst(p.tx, p.ty, p.color, 3, 40);
   } else {
     fx.push({ k: 'ring', x: p.tx, y: p.ty, max: p.splash, life: 0.35, t: 0.35, color: p.color });
     burst(p.tx, p.ty, p.color, 12, 110);
-    for (const e of enemies) {
-      if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash + e.def.size * 0.5) damage(e, p.dmg);
+    sfx('boom');
+    if (!p.vis) {
+      for (const e of enemies.slice()) {
+        if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash + e.def.size * 0.5) damage(e, p.dmg);
+      }
     }
   }
 }
 function waveCleared() {
   const bonus = 25 + state.wave * 4;
   state.gold += bonus;
-  floats.push({ x: W / 2, y: H / 2, text: `第 ${state.wave} 波完成　+${bonus}`, life: 1.8, max: 1.8, color: '#6fdc9a', big: true });
-  if (state.wave >= MAX_WAVE) { endGame(true); return; }
+  emit({ e: 'float', x: W / 2, y: H / 2, text: `第 ${state.wave} 波完成　+${bonus}`, life: 1.8, color: '#6fdc9a', big: 1 });
+  if (state.wave >= MAX_WAVE && !state.endless) { endGame(true); return; }
   state.phase = 'idle';
   setHint(`第 ${state.wave} 波完成，獲得 ${bonus} 金幣。趁空檔建造或升級。`);
   refreshAll();
 }
 function endGame(win) {
-  state.phase = 'over';
-  const reached = win ? MAX_WAVE : Math.max(0, state.wave - 1);
-  if (reached > best) { best = reached; try { localStorage.setItem(KEY, String(best)); } catch (e) {} }
-  $('oTitle').textContent = win ? '港口守住了' : '港口失守';
-  $('oText').textContent = win ? `撐過全部 ${MAX_WAVE} 波，擊沉 ${kills} 艘敵艦。` : `撐過 ${reached} 波，擊沉 ${kills} 艘敵艦。`;
-  $('oBest').textContent = `最佳紀錄：${best} 波`;
-  $('overlay').hidden = false;
+  state.phase = 'over'; state.win = win;
+  emit({ e: 'sfx', s: win ? 'win' : 'lose' });
+  showOver();
   updateStats();
 }
-function startWave() {
-  if (state.phase !== 'idle') return;
-  state.wave++;
-  queue = buildQueue(state.wave);
-  spawnT = 0.4;
-  state.phase = 'running';
-  setHint(`第 ${state.wave} 波來襲。`);
-  refreshAll();
+function showOver() {
+  const win = state.win;
+  const reached = win ? (state.endless ? state.wave : MAX_WAVE) : Math.max(0, state.wave - 1);
+  if (reached > best) { best = reached; try { localStorage.setItem(KEY, String(best)); } catch (e) {} }
+  $('oTitle').textContent = win ? '港口守住了' : '港口失守';
+  $('oText').textContent = win ? `撐過全部 ${MAX_WAVE} 波，擊沉 ${kills} 艘敵艦。`
+    : state.endless ? `無盡模式撐到第 ${reached} 波，擊沉 ${kills} 艘敵艦。` : `撐過 ${reached} 波，擊沉 ${kills} 艘敵艦。`;
+  $('oBest').textContent = `最佳紀錄：${best} 波`;
+  const guest = role === 'guest';
+  $('againBtn').hidden = guest;
+  $('contBtn').hidden = guest || !win || state.endless;
+  $('oWait').hidden = !guest;
+  $('overlay').hidden = false;
+}
+
+function updateVisuals(dt) {
+  for (const p of projs) {
+    if (p.tgt && p.tgt.alive) { p.tx = p.tgt.x; p.ty = p.tgt.y; }
+    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), step = p.sp * dt;
+    if (d <= step + 3) { impact(p); p.done = true; }
+    else { p.x += dx / d * step; p.y += dy / d * step; p.ang = Math.atan2(dy, dx); }
+  }
+  projs = projs.filter(p => !p.done);
+  for (const f of fx) f.t -= dt;
+  fx = fx.filter(f => f.t > 0);
+  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; }
+  parts = parts.filter(p => p.life > 0);
+  for (const f of floats) { f.y -= 22 * dt; f.life -= dt; }
+  floats = floats.filter(f => f.life > 0);
+  for (const t of towers) t.recoil = Math.max(0, (t.recoil || 0) - dt * 30);
+  state.flash = Math.max(0, state.flash - dt * 2);
 }
 
 function update(dt) {
-  if (state.phase === 'running') {
-    if (queue.length) {
-      spawnT -= dt;
-      if (spawnT <= 0) { const it = queue.shift(); spawn(it.t); spawnT = it.gap; }
-    } else if (!enemies.length) { waveCleared(); if (state.phase === 'over') return; }
+  state.cd.air = Math.max(0, state.cd.air - dt);
+  state.cd.freeze = Math.max(0, state.cd.freeze - dt);
+  if (state.phase === 'running' && queue.length) {
+    spawnT -= dt;
+    if (spawnT <= 0) { const it = queue.shift(); spawnEnemy(it.t, 0); spawnT = it.gap; }
   }
   let leaked = false;
   for (const e of enemies) {
@@ -450,31 +679,47 @@ function update(dt) {
     if (e.dist >= total) { e.alive = false; state.lives -= e.def.dmg; state.flash = 1; leaked = true; continue; }
     const p = posAt(e.dist); e.x = p.x; e.y = p.y; e.ang = p.ang;
   }
-  if (leaked) updateStats();
-  if (state.lives <= 0) { state.lives = 0; endGame(false); return; }
+  if (leaked) { emit({ e: 'sfx', s: 'leak' }); updateStats(); }
+  if (state.lives <= 0) { state.lives = 0; enemies = enemies.filter(e => e.alive); endGame(false); return; }
+  for (const h of enemies) {
+    if (h.type !== 'healer' || !h.alive) continue;
+    for (const e of enemies) {
+      if (e === h || !e.alive || e.hp >= e.max) continue;
+      if ((e.x - h.x) * (e.x - h.x) + (e.y - h.y) * (e.y - h.y) < 10000) e.hp = Math.min(e.max, e.hp + e.max * 0.06 * dt);
+    }
+  }
+  for (const s of strikes) {
+    s.t -= dt;
+    if (s.t > 0) continue;
+    s.done = true;
+    emit({ e: 'ring', x: Math.round(s.x), y: Math.round(s.y), max: 54, life: 0.35, color: '#ff7b7b', s: 'air' });
+    emit({ e: 'burst', x: s.x, y: s.y, color: '#ffb36b', n: 12, sp: 120 });
+    for (const e of enemies.slice()) if (e.alive && Math.hypot(e.x - s.x, e.y - s.y) <= 54 + e.def.size * 0.5) damage(e, s.dmg);
+  }
+  strikes = strikes.filter(s => !s.done);
   for (const t of towers) {
-    t.cd -= dt; t.recoil = Math.max(0, t.recoil - dt * 30);
+    if (t.type === 'support') continue;
+    t.cd -= dt;
     if (t.cd > 0) continue;
     const s = stats(t), tgt = pickTarget(t, s.range);
     if (!tgt) continue;
     fire(t, s, tgt);
     t.cd = s.rate;
   }
-  for (const p of projs) {
-    if (p.tgt && p.tgt.alive) { p.tx = p.tgt.x; p.ty = p.tgt.y; }
-    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), step = p.sp * dt;
-    if (d <= step + 3) { impact(p); p.done = true; }
-    else { p.x += dx / d * step; p.y += dy / d * step; p.ang = Math.atan2(dy, dx); }
-  }
+  updateVisuals(dt);
   enemies = enemies.filter(e => e.alive);
-  projs = projs.filter(p => !p.done);
-  for (const f of fx) f.t -= dt;
-  fx = fx.filter(f => f.t > 0);
-  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; }
-  parts = parts.filter(p => p.life > 0);
-  for (const f of floats) { f.y -= 22 * dt; f.life -= dt; }
-  floats = floats.filter(f => f.life > 0);
-  state.flash = Math.max(0, state.flash - dt * 2);
+  if (state.phase === 'running' && !queue.length && !enemies.length) waveCleared();
+}
+
+/* 玩家端：用房主的快照推進畫面，敵艦位置以前進速度外插 */
+function updateGuest(dt) {
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e.dist = Math.min(total, e.dist + e.def.speed * (e.slowT > 0 ? 1 - e.slow : 1) * dt);
+    if (e.slowT > 0) e.slowT -= dt;
+    const p = posAt(e.dist); e.x = p.x; e.y = p.y; e.ang = p.ang;
+  }
+  updateVisuals(dt);
 }
 
 /* ---------- 繪製 ---------- */
@@ -486,6 +731,10 @@ function drawTower(t, ghost) {
   ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fill(); ctx.stroke();
   ctx.fillStyle = d.color;
   for (let i = 0; i < t.lvl; i++) { ctx.beginPath(); ctx.arc((i - (t.lvl - 1) / 2) * 7, 15, 2, 0, 7); ctx.fill(); }
+  if (role !== 'solo' && !ghost && t.owner != null) {
+    const pc = players.find(p => p.id === t.owner);
+    if (pc) { ctx.fillStyle = pc.color; ctx.beginPath(); ctx.arc(15, -15, 3.5, 0, 7); ctx.fill(); }
+  }
   const rc = t.recoil || 0;
   if (t.type === 'frost') {
     ctx.rotate(time * 0.6);
@@ -496,6 +745,20 @@ function drawTower(t, ghost) {
     ctx.beginPath();
     for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; ctx.moveTo(Math.cos(a) * 13, Math.sin(a) * 13); ctx.lineTo(-Math.cos(a) * 13, -Math.sin(a) * 13); }
     ctx.stroke();
+  } else if (t.type === 'support') {
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = d.color; ctx.fillRect(-9, -9, 18, 18);
+    ctx.fillStyle = '#10262d'; ctx.fillRect(-4, -4, 8, 8);
+    ctx.rotate(-Math.PI / 4);
+    ctx.strokeStyle = d.color; ctx.globalAlpha = (ghost ? 0.65 : 1) * (0.35 + 0.25 * Math.sin(time * 3)); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.stroke();
+  } else if (t.type === 'arc') {
+    ctx.fillStyle = '#2b2140'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+    ctx.strokeStyle = d.color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.stroke();
+    ctx.rotate(t.ang || 0);
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(14, -5); ctx.moveTo(4, 0); ctx.lineTo(16, 0); ctx.moveTo(4, 0); ctx.lineTo(14, 5); ctx.stroke();
+    ctx.fillStyle = d.color; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.fill();
   } else {
     ctx.rotate(t.ang || 0);
     if (t.type === 'gun') {
@@ -529,6 +792,11 @@ function drawEnemy(e) {
   ctx.moveTo(s * 1.3, 0); ctx.lineTo(s * 0.5, s * 0.8); ctx.lineTo(-s, s * 0.8); ctx.lineTo(-s * 1.1, 0); ctx.lineTo(-s, -s * 0.8); ctx.lineTo(s * 0.5, -s * 0.8);
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(-s * 0.4, -s * 0.35, s * 0.8, s * 0.7);
+  if (e.type === 'healer') {
+    ctx.fillStyle = '#eafff5'; ctx.fillRect(-s * 0.5, -s * 0.12, s, s * 0.24); ctx.fillRect(-s * 0.12, -s * 0.5, s * 0.24, s);
+  } else if (e.type === 'splitter') {
+    ctx.fillStyle = '#2a1a0a'; ctx.beginPath(); ctx.arc(-s * 0.2, -s * 0.28, s * 0.2, 0, 7); ctx.arc(-s * 0.2, s * 0.28, s * 0.2, 0, 7); ctx.fill();
+  }
   if (e.slowT > 0) { ctx.strokeStyle = 'rgba(127,216,240,.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, s * 1.3, 0, 7); ctx.stroke(); }
   ctx.restore();
   if (e.hp < e.max) {
@@ -541,13 +809,11 @@ function drawEnemy(e) {
 function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.drawImage(bg, 0, 0, W, H);
-  // 水流
   ctx.save();
   ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
   ctx.setLineDash([8, 22]); ctx.lineDashOffset = -time * 28;
   ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
   ctx.restore();
-  // 懸停預覽
   if (armed && hover && hover.c >= 0 && hover.c < COLS && hover.r >= 0 && hover.r < ROWS) {
     const ok = canPlace(hover.c, hover.r), afford = state.gold >= TOWERS[armed].cost;
     ctx.fillStyle = ok && afford ? 'rgba(111,220,154,.28)' : 'rgba(255,123,123,.3)';
@@ -558,6 +824,7 @@ function render() {
       drawTower(gt, true);
     }
   }
+  if (armedAb === 'air' && hover) rangeCircle(hover.x, hover.y, 90, '#ff7b7b', true);
   if (selected) {
     rangeCircle(selected.x, selected.y, stats(selected).range, '#e6f0f2', true);
     ctx.save(); ctx.strokeStyle = '#e6f0f2'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
@@ -578,6 +845,9 @@ function render() {
     if (f.k === 'ring') {
       ctx.globalAlpha = 1 - pr; ctx.strokeStyle = f.color; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(f.x, f.y, f.max * Math.min(1, pr * 1.2), 0, 7); ctx.stroke();
+    } else if (f.k === 'warn') {
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(pr * 25); ctx.strokeStyle = f.color; ctx.fillStyle = 'rgba(255,80,80,.12)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.max, 0, 7); ctx.fill(); ctx.stroke();
     } else {
       ctx.globalAlpha = 1 - pr; ctx.strokeStyle = f.color; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(f.x1, f.y1); ctx.lineTo(f.x2, f.y2); ctx.stroke();
@@ -597,6 +867,15 @@ function render() {
     ctx.fillText(f.text, f.x, f.y);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'start';
+  if (role !== 'solo') {
+    for (const p of players) {
+      if (p.id === myId || !(p.x >= 0)) continue;
+      ctx.save(); ctx.translate(p.x, p.y);
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(11, 5); ctx.lineTo(5, 11); ctx.closePath(); ctx.fill();
+      ctx.font = '600 12px "Noto Sans TC",sans-serif'; ctx.fillText(p.name, 13, 20);
+      ctx.restore();
+    }
+  }
   if (state.flash > 0) {
     const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85);
     g.addColorStop(0, 'rgba(255,80,80,0)'); g.addColorStop(1, `rgba(255,80,80,${state.flash * 0.45})`);
@@ -613,38 +892,60 @@ function render() {
 function buildShop() {
   const shop = $('shop');
   shop.innerHTML = '';
-  Object.keys(TOWERS).forEach((k, i) => {
+  TK.forEach((k, i) => {
     const d = TOWERS[k];
     const b = document.createElement('button');
     b.type = 'button'; b.id = 'tw-' + k; b.className = 'tw';
     b.style.setProperty('--c', d.color);
     b.setAttribute('aria-pressed', 'false');
     b.innerHTML = `<b>${i + 1}　${d.name}</b><span class="coin">${d.cost}</span><small>${d.desc}</small>`;
-    b.addEventListener('click', () => arm(k));
+    b.addEventListener('click', () => { ensureAC(); arm(k); });
     shop.appendChild(b);
   });
+}
+function arm(type) {
+  if (state.phase === 'over') return;
+  armed = armed === type ? null : type;
+  armedAb = null; selected = null;
+  if (armed) setHint(`${TOWERS[armed].name}：${TOWERS[armed].desc}。點擊地圖空地放置。`);
+  refreshAll();
+}
+function disarm() { armed = null; armedAb = null; refreshAll(); }
+function fmtCd(v) { return v > 0 ? `冷卻 ${Math.ceil(v)} 秒` : '就緒'; }
+function updateAbilityUI() {
+  const a = $('abAir'), f = $('abFreeze');
+  $('abAirT').textContent = armedAb === 'air' ? '點地圖選目標' : fmtCd(state.cd.air);
+  $('abFreezeT').textContent = fmtCd(state.cd.freeze);
+  a.disabled = state.cd.air > 0 || state.phase === 'over';
+  f.disabled = state.cd.freeze > 0 || state.phase === 'over';
+  a.setAttribute('aria-pressed', armedAb === 'air' ? 'true' : 'false');
 }
 function updateStats() {
   $('sLives').textContent = state.lives;
   $('sGold').textContent = state.gold;
-  $('sWave').textContent = `${state.wave}/${MAX_WAVE}`;
+  $('sWave').textContent = state.endless ? `${state.wave} 無盡` : `${state.wave}/${MAX_WAVE}`;
   const sb = $('startBtn');
   if (state.phase === 'idle') { sb.disabled = false; sb.textContent = `開始第 ${state.wave + 1} 波`; }
   else if (state.phase === 'running') { sb.disabled = true; sb.textContent = `第 ${state.wave} 波進行中…`; }
   else { sb.disabled = true; sb.textContent = '遊戲結束'; }
-  for (const k in TOWERS) {
+  $('pauseBtn').textContent = state.paused ? '繼續' : '暫停';
+  $('speedBtn').textContent = `速度 ×${state.speed}`;
+  $('pauseBtn').disabled = $('speedBtn').disabled = role === 'guest';
+  $('muteBtn').textContent = muted ? '音效 關' : '音效 開';
+  for (const k of TK) {
     const b = $('tw-' + k); if (!b) continue;
     b.classList.toggle('poor', state.gold < TOWERS[k].cost);
     b.setAttribute('aria-pressed', armed === k ? 'true' : 'false');
   }
   const u = $('upBtn');
   if (u && selected) { const c = upCost(selected); u.disabled = c == null || state.gold < c || state.phase === 'over'; }
+  updateAbilityUI();
 }
 function renderPreview() {
   const running = state.phase === 'running';
-  const n = Math.min(MAX_WAVE, running ? state.wave : state.wave + 1);
+  const n = state.endless || state.wave < MAX_WAVE ? (running ? state.wave : state.wave + 1) : MAX_WAVE;
   $('previewLabel').textContent = running ? `本波敵艦（第 ${n} 波）` : `下一波（第 ${n} 波）`;
-  $('preview').innerHTML = waveGroups(n).map(g => {
+  $('preview').innerHTML = waveGroups(Math.max(1, n)).map(g => {
     const d = ENEMIES[g.t];
     return `<span class="chip"><i class="dot" style="background:${d.color}"></i>${d.name} ×${g.c}</span>`;
   }).join('');
@@ -661,31 +962,221 @@ function renderSel() {
     return;
   }
   const t = selected, d = TOWERS[t.type], s = stats(t), uc = upCost(t);
-  let extra = '';
-  if (s.splash) extra = `<div><dt>爆炸範圍</dt><dd>${Math.round(s.splash)}</dd></div>`;
-  if (s.slow) extra = `<div><dt>減速</dt><dd>${Math.round(s.slow * 100)}%</dd></div>`;
+  let cells;
+  if (t.type === 'support') {
+    cells = `<div><dt>增幅</dt><dd>+${Math.round(s.buff * 100)}%</dd></div><div><dt>範圍</dt><dd>${Math.round(s.range)}</dd></div><div><dt>等級</dt><dd>${t.lvl}/3</dd></div>`;
+  } else {
+    let extra = '';
+    if (s.splash) extra = `<div><dt>爆炸範圍</dt><dd>${Math.round(s.splash)}</dd></div>`;
+    if (s.slow) extra = `<div><dt>減速</dt><dd>${Math.round(s.slow * 100)}%</dd></div>`;
+    if (s.chain) extra = `<div><dt>連鎖</dt><dd>${s.chain} 目標</dd></div>`;
+    cells = `<div><dt>傷害</dt><dd>${Math.round(s.dmg)}</dd></div><div><dt>射程</dt><dd>${Math.round(s.range)}</dd></div><div><dt>射速</dt><dd>${(1 / s.rate).toFixed(1)}/秒</dd></div>${extra}`;
+  }
+  const canSell = t.owner === myId || myId === 0;
   el.innerHTML = `
     <h2>砲塔資訊</h2>
     <div class="sel-head"><i class="dot" style="background:${d.color}"></i><b>${d.name}</b><span class="lv">Lv ${t.lvl}/3</span></div>
-    <dl class="kv">
-      <div><dt>傷害</dt><dd>${Math.round(s.dmg)}</dd></div>
-      <div><dt>射程</dt><dd>${Math.round(s.range)}</dd></div>
-      <div><dt>射速</dt><dd>${(1 / s.rate).toFixed(1)}/秒</dd></div>
-      ${extra}
-    </dl>
+    <dl class="kv">${cells}</dl>
     <div class="row">
       <button id="upBtn" type="button">${uc == null ? '已滿級' : `升級 <span class="coin">${uc}</span>`}</button>
-      <button id="sellBtn" type="button">出售 <span class="coin">${sellValue(t)}</span></button>
+      <button id="sellBtn" type="button"${canSell ? '' : ' disabled'}>出售 <span class="coin">${sellValue(t)}</span></button>
     </div>
-    <button id="modeBtn" type="button">目標：${MODES[t.mode]}</button>`;
-  $('upBtn').addEventListener('click', upgrade);
-  $('sellBtn').addEventListener('click', sell);
-  $('modeBtn').addEventListener('click', () => {
-    t.mode = MODE_ORDER[(MODE_ORDER.indexOf(t.mode) + 1) % MODE_ORDER.length];
-    $('modeBtn').textContent = `目標：${MODES[t.mode]}`;
+    ${t.type === 'support' ? '' : `<button id="modeBtn" type="button">目標：${MODES[t.mode]}</button>`}`;
+  $('upBtn').addEventListener('click', upgradeSel);
+  $('sellBtn').addEventListener('click', sellSel);
+  const mb = $('modeBtn');
+  if (mb) mb.addEventListener('click', () => {
+    const nm = MODE_ORDER[(MODE_ORDER.indexOf(t.mode) + 1) % MODE_ORDER.length];
+    t.mode = nm; mb.textContent = `目標：${MODES[nm]}`;
+    sendCmd({ k: 'mode', id: t.id, m: nm });
+  });
+  updateStats();
+}
+function refreshAll() { updateStats(); renderPreview(); renderSel(); updatePlayersUI(); }
+function upgradeSel() {
+  const t = selected; if (!t) return;
+  const c = upCost(t);
+  if (c == null) { setHint('已經是最高等級。'); return; }
+  if (state.gold < c) { setHint(`金幣不足，升級需要 ${c}。`); return; }
+  sendCmd({ k: 'up', id: t.id });
+}
+function sellSel() { if (selected) sendCmd({ k: 'sell', id: selected.id }); }
+
+/* ---------- 多人連線 ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let plSig = '';
+function inviteLink() {
+  try { if (/^https?:/.test(location.href)) return location.origin + location.pathname + '?room=' + roomCode; } catch (e) {}
+  return roomCode;
+}
+function updatePlayersUI() {
+  const pn = $('plPanel');
+  pn.hidden = role === 'solo';
+  if (role === 'solo') return;
+  const sig = role + '|' + roomCode + '|' + myId + '|' + players.map(p => p.id + p.name).join(',');
+  if (sig === plSig) return;
+  plSig = sig;
+  const html = players.map(p => `<div class="plrow"><i class="dot" style="background:${p.color}"></i><span>${esc(p.name)}${p.id === myId ? '（你）' : ''}${p.id === 0 ? '　房主' : ''}</span></div>`).join('');
+  $('plCount').textContent = `${players.length}/${MAX_PLAYERS}　房間 ${roomCode}`;
+  $('plList').innerHTML = html;
+  $('lobbyList').innerHTML = html;
+  $('inviteIn').value = inviteLink();
+  $('lobbyLink').value = inviteLink();
+  $('lobbyCode').textContent = roomCode;
+}
+function copyText(text, inp) {
+  const manual = () => { try { inp.focus(); inp.select(); } catch (e) {} setHint('請手動複製已選取的連結。'); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(() => setHint('已複製邀請連結。')).catch(manual); return; }
+  } catch (e) {}
+  manual();
+}
+function menuMsg(s) { $('menuMsg').textContent = s; }
+function cleanupPeer() {
+  try { if (peer) peer.destroy(); } catch (e) {}
+  peer = null; hostConn = null;
+}
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function randCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return s; }
+
+function startHost(tries) {
+  if (typeof Peer === 'undefined') { menuMsg('連線元件沒有載入，請確認網路後重新整理頁面。'); return; }
+  menuMsg('建立房間中…');
+  const code = randCode(); let done = false, tmo = 0;
+  try { peer = new Peer('harbor-' + code); } catch (e) { menuMsg('這個環境不支援連線功能。'); return; }
+  tmo = setTimeout(() => { if (!done) { menuMsg('連不上配對伺服器。此環境可能不支援連線，請部署到網站後再試。'); cleanupPeer(); } }, 10000);
+  peer.on('open', () => {
+    done = true; clearTimeout(tmo);
+    role = 'host'; roomCode = code; myId = 0;
+    players = [{ id: 0, name: '玩家1', color: PCOL[0], x: -100, y: -100 }];
+    reset(diffPick);
+    menuOpen = true; plSig = '';
+    $('menu').hidden = true; $('lobby').hidden = false;
+    refreshAll();
+  });
+  peer.on('connection', onGuestConnection);
+  peer.on('error', err => {
+    if (!done) {
+      clearTimeout(tmo); cleanupPeer();
+      if (err.type === 'unavailable-id' && (tries || 0) < 3) { startHost((tries || 0) + 1); return; }
+      menuMsg('建立房間失敗：' + err.type);
+    } else setHint('連線錯誤：' + err.type);
   });
 }
-function refreshAll() { updateStats(); renderPreview(); renderSel(); }
+function nextPid() { for (let i = 1; i < MAX_PLAYERS; i++) if (!players.some(p => p.id === i)) return i; return -1; }
+function onGuestConnection(conn) {
+  conn.on('open', () => {
+    const id = nextPid();
+    if (id < 0) { conn.send({ t: 'full' }); setTimeout(() => { try { conn.close(); } catch (e) {} }, 300); return; }
+    const p = { id, name: '玩家' + (id + 1), color: PCOL[id], x: -100, y: -100, conn };
+    players.push(p);
+    conn.send({ t: 'welcome', id, diff: state.diff });
+    updatePlayersUI();
+    setHint(`${p.name} 加入了房間。`);
+  });
+  conn.on('data', m => {
+    const p = players.find(q => q.conn === conn); if (!p || !m) return;
+    if (m.t === 'cmd' && m.c) {
+      const r = execCmd(m.c, p.id);
+      if (r && r.ok === false && r.msg) conn.send({ t: 'msg', text: r.msg });
+      refreshAll();
+    } else if (m.t === 'cur') { p.x = +m.x; p.y = +m.y; }
+  });
+  conn.on('close', () => {
+    const p = players.find(q => q.conn === conn);
+    players = players.filter(q => q.conn !== conn);
+    if (p) setHint(`${p.name} 離開了房間。`);
+    updatePlayersUI();
+  });
+}
+function joinRoom(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)) { menuMsg('請輸入 5 碼房間代碼。'); return; }
+  if (typeof Peer === 'undefined') { menuMsg('連線元件沒有載入，請確認網路後重新整理頁面。'); return; }
+  menuMsg('連線中…');
+  let ok = false, tmo = 0;
+  try { peer = new Peer(); } catch (e) { menuMsg('這個環境不支援連線功能。'); return; }
+  tmo = setTimeout(() => { if (!ok) { menuMsg('連線逾時，請確認代碼與網路，或此環境不支援連線。'); cleanupPeer(); } }, 15000);
+  peer.on('open', () => {
+    const c = peer.connect('harbor-' + code, { reliable: true, serialization: 'json' });
+    hostConn = c;
+    c.on('data', m => {
+      if (!m) return;
+      if (m.t === 'welcome') {
+        ok = true; clearTimeout(tmo);
+        role = 'guest'; myId = m.id; roomCode = code; plSig = '';
+        reset(m.diff); menuOpen = false;
+        $('menu').hidden = true;
+        refreshAll();
+        setHint('已加入房間，和房主一起守住港口。');
+      } else if (m.t === 'full') { clearTimeout(tmo); menuMsg('房間已滿（最多 4 人）。'); cleanupPeer(); }
+      else if (m.t === 's' && role === 'guest') applySnapshot(m);
+      else if (m.t === 'msg') setHint(m.text);
+    });
+    c.on('close', () => { if (role === 'guest') $('disc').hidden = false; });
+    c.on('error', () => { if (!ok) menuMsg('連線失敗，請稍後再試。'); });
+  });
+  peer.on('error', err => {
+    if (!ok) { clearTimeout(tmo); menuMsg(err.type === 'peer-unavailable' ? '找不到這個房間，請確認代碼。' : '連線失敗：' + err.type); cleanupPeer(); }
+  });
+}
+
+function buildSnapshot() {
+  const ev = outbox.length > 240 ? outbox.slice(-240) : outbox;
+  outbox = [];
+  return {
+    t: 's',
+    g: [state.gold, state.lives, state.wave, PH.indexOf(state.phase), state.speed, state.paused ? 1 : 0, kills, state.endless ? 1 : 0, state.win ? 1 : 0],
+    cd: [+state.cd.air.toFixed(1), +state.cd.freeze.toFixed(1)],
+    T: towers.map(t => [t.id, TK.indexOf(t.type), t.c, t.r, t.lvl, MODE_ORDER.indexOf(t.mode), Math.round(t.ang * 100), t.owner, t.spent]),
+    E: enemies.map(e => [e.id, EK.indexOf(e.type), Math.round(e.dist), Math.round(e.hp), e.max, e.slowT > 0 ? Math.round(e.slow * 100) : 0]),
+    P: players.map(p => [p.id, p.name, p.color, Math.round(p.x), Math.round(p.y)]),
+    ev
+  };
+}
+function broadcast() {
+  if (role !== 'host') return;
+  const targets = players.filter(p => p.conn && p.conn.open);
+  if (!targets.length) { outbox = []; return; }
+  const snap = buildSnapshot();
+  for (const p of targets) { try { p.conn.send(snap); } catch (e) {} }
+}
+let selKey = '', preKey = '';
+function applySnapshot(m) {
+  const g = m.g, prevPhase = state.phase, prevLives = state.lives;
+  state.gold = g[0]; state.lives = g[1]; state.wave = g[2]; state.phase = PH[g[3]] || 'idle';
+  state.speed = g[4]; state.paused = !!g[5]; kills = g[6]; state.endless = !!g[7]; state.win = !!g[8];
+  state.cd.air = m.cd[0]; state.cd.freeze = m.cd[1];
+  if (state.lives < prevLives) state.flash = 1;
+  towers = m.T.map(a => {
+    const old = towers.find(t => t.id === a[0]);
+    return { id: a[0], type: TK[a[1]], c: a[2], r: a[3], x: a[2] * C + C / 2, y: a[3] * C + C / 2, lvl: a[4], mode: MODE_ORDER[a[5]], ang: a[6] / 100, owner: a[7], spent: a[8], recoil: old ? old.recoil : 0 };
+  });
+  const seen = new Set();
+  for (const a of m.E) {
+    let e = emap.get(a[0]);
+    if (!e) {
+      const def = ENEMIES[EK[a[1]]];
+      e = { id: a[0], type: EK[a[1]], def, hp: a[3], max: a[4], dist: a[2], x: 0, y: 0, ang: 0, slow: 0, slowT: 0, alive: true };
+      emap.set(a[0], e); enemies.push(e);
+    }
+    e.dist = a[2]; e.hp = a[3]; e.max = a[4]; e.slow = a[5] / 100; e.slowT = a[5] ? 0.4 : 0;
+    const p = posAt(e.dist); e.x = p.x; e.y = p.y; e.ang = p.ang;
+    seen.add(a[0]);
+  }
+  enemies = enemies.filter(e => { if (seen.has(e.id)) return true; e.alive = false; emap.delete(e.id); return false; });
+  players = m.P.map(a => ({ id: a[0], name: a[1], color: a[2], x: a[3], y: a[4] }));
+  for (const ev of m.ev || []) applyEvent(ev);
+  if (selected) selected = towers.find(t => t.id === selected.id) || null;
+  if (state.phase === 'over' && prevPhase !== 'over') showOver();
+  else if (state.phase !== 'over' && prevPhase === 'over') $('overlay').hidden = true;
+  const sk = selected ? [selected.id, selected.lvl, selected.mode, selected.spent].join() : '-';
+  const pk = state.wave + state.phase + state.endless;
+  updateStats();
+  if (pk !== preKey) { preKey = pk; renderPreview(); }
+  if (sk !== selKey || (!selected && selKey !== '-')) { selKey = sk; renderSel(); }
+  updatePlayersUI();
+}
 
 /* ---------- 輸入 ---------- */
 function pointer(ev) {
@@ -693,62 +1184,125 @@ function pointer(ev) {
   const x = (ev.clientX - r.left) * W / r.width, y = (ev.clientY - r.top) * H / r.height;
   return { x, y, c: Math.floor(x / C), r: Math.floor(y / C) };
 }
-canvas.addEventListener('pointermove', ev => { hover = pointer(ev); });
-canvas.addEventListener('pointerleave', () => { hover = null; });
+let curAt = 0;
+canvas.addEventListener('pointermove', ev => {
+  hover = pointer(ev);
+  if (role === 'solo') return;
+  if (role === 'host') { const me = players.find(p => p.id === 0); if (me) { me.x = hover.x; me.y = hover.y; } }
+  else if (hostConn && hostConn.open && performance.now() - curAt > 100) { curAt = performance.now(); hostConn.send({ t: 'cur', x: Math.round(hover.x), y: Math.round(hover.y) }); }
+});
+canvas.addEventListener('pointerleave', () => {
+  hover = null;
+  if (role === 'host') { const me = players.find(p => p.id === 0); if (me) me.x = -100; }
+});
 canvas.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') hover = null; });
 canvas.addEventListener('contextmenu', ev => { ev.preventDefault(); disarm(); });
 canvas.addEventListener('pointerdown', ev => {
   if (ev.button === 2) return;
+  ensureAC();
   const p = pointer(ev); hover = p;
-  if (state.phase === 'over') return;
+  if (state.phase === 'over' || menuOpen && role !== 'guest') return;
+  if (armedAb === 'air') { armedAb = null; sendCmd({ k: 'air', x: Math.round(p.x), y: Math.round(p.y) }); return; }
   const t = towerAt(p.c, p.r);
-  if (t) { selected = t; armed = null; setHint(`${TOWERS[t.type].name}　Lv ${t.lvl}。可在右側升級、出售或切換目標。`); refreshAll(); return; }
-  if (armed) place(p.c, p.r);
-  else if (selected) { selected = null; refreshAll(); }
+  if (t) { selected = t; armed = null; selKey = ''; setHint(`${TOWERS[t.type].name}　Lv ${t.lvl}。可在右側升級、出售或切換目標。`); refreshAll(); return; }
+  if (armed) {
+    const d = TOWERS[armed];
+    if (!canPlace(p.c, p.r)) { setHint('這格不能建造：航道、燈塔或已有砲塔。'); return; }
+    if (state.gold < d.cost) { setHint(`金幣不足，${d.name}需要 ${d.cost}。`); return; }
+    sendCmd({ k: 'place', type: armed, c: p.c, r: p.r });
+  } else if (selected) { selected = null; selKey = ''; refreshAll(); }
 });
 function togglePause() {
-  if (state.phase === 'over') return;
+  if (role === 'guest' || state.phase === 'over') return;
   state.paused = !state.paused;
-  $('pauseBtn').textContent = state.paused ? '繼續' : '暫停';
+  updateStats();
 }
 function cycleSpeed() {
+  if (role === 'guest') return;
   state.speed = state.speed % 3 + 1;
-  $('speedBtn').textContent = `速度 ×${state.speed}`;
+  updateStats();
 }
-$('startBtn').addEventListener('click', startWave);
+function abilityClick(name) {
+  ensureAC();
+  if (state.phase === 'over') return;
+  if (name === 'freeze') sendCmd({ k: 'freeze' });
+  else { armedAb = armedAb === 'air' ? null : 'air'; armed = null; selected = null; if (armedAb) setHint('點擊地圖選擇空襲目標，Esc 取消。'); refreshAll(); }
+}
+$('startBtn').addEventListener('click', () => { ensureAC(); sendCmd({ k: 'start' }); });
 $('pauseBtn').addEventListener('click', togglePause);
 $('speedBtn').addEventListener('click', cycleSpeed);
-$('againBtn').addEventListener('click', reset);
+$('muteBtn').addEventListener('click', () => {
+  muted = !muted; try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (e) {}
+  ensureAC(); updateStats();
+});
+$('abAir').addEventListener('click', () => abilityClick('air'));
+$('abFreeze').addEventListener('click', () => abilityClick('freeze'));
+$('againBtn').addEventListener('click', () => {
+  if (role === 'guest') return;
+  reset(); refreshAll();
+});
+$('contBtn').addEventListener('click', () => {
+  if (role === 'guest') return;
+  state.endless = true; state.phase = 'idle'; state.win = false;
+  $('overlay').hidden = true;
+  setHint('無盡模式開始，敵艦會越來越強。');
+  refreshAll();
+});
+$('reloadBtn').addEventListener('click', () => location.reload());
+$('inviteBtn').addEventListener('click', () => copyText($('inviteIn').value, $('inviteIn')));
+$('lobbyCopy').addEventListener('click', () => copyText($('lobbyLink').value, $('lobbyLink')));
+$('lobbyGo').addEventListener('click', () => { $('lobby').hidden = true; menuOpen = false; ensureAC(); setHint('房間已開放，按「開始」就能發動第一波。'); });
+$('soloBtn').addEventListener('click', () => { ensureAC(); role = 'solo'; myId = 0; players = []; reset(diffPick); menuOpen = false; $('menu').hidden = true; refreshAll(); });
+$('hostBtn').addEventListener('click', () => { ensureAC(); startHost(0); });
+$('joinBtn').addEventListener('click', () => { ensureAC(); joinRoom($('codeIn').value); });
+$('codeIn').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ensureAC(); joinRoom($('codeIn').value); } });
+$('diffSeg').addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('button'); if (!b) return;
+  diffPick = b.dataset.d;
+  for (const x of $('diffSeg').querySelectorAll('button')) x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+});
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.target && ev.target.tagName === 'INPUT') return;
   const k = ev.key;
-  if (k >= '1' && k <= '4') { arm(Object.keys(TOWERS)[+k - 1]); return; }
-  if (k === 'Escape') { armed = null; selected = null; refreshAll(); return; }
+  if (k >= '1' && k <= '6') { arm(TK[+k - 1]); return; }
+  if (k === 'Escape') { armed = null; armedAb = null; selected = null; selKey = ''; refreshAll(); return; }
   if (k === ' ') {
     if (ev.target.closest && ev.target.closest('button')) return;
     ev.preventDefault();
-    if (state.phase === 'idle') startWave(); else togglePause();
+    if (menuOpen && role !== 'guest') return;
+    if (state.phase === 'idle') sendCmd({ k: 'start' }); else togglePause();
     return;
   }
-  if (k === 'u' || k === 'U') upgrade();
-  else if (k === 's' || k === 'S') sell();
+  if (k === 'u' || k === 'U') upgradeSel();
+  else if (k === 's' || k === 'S') sellSel();
   else if (k === 'p' || k === 'P') togglePause();
   else if (k === 'f' || k === 'F') cycleSpeed();
+  else if (k === 'a' || k === 'A') abilityClick('air');
+  else if (k === 'z' || k === 'Z') abilityClick('freeze');
+  else if (k === 'm' || k === 'M') $('muteBtn').click();
 });
 
 /* ---------- 主迴圈 ---------- */
-let last = performance.now();
+let last = performance.now(), netAcc = 0, abAcc = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   time += dt;
-  if (!state.paused && state.phase !== 'over') {
+  if (role === 'guest') updateGuest(dt);
+  else if (!menuOpen && !state.paused && state.phase !== 'over') {
     for (let i = 0; i < state.speed; i++) { update(dt); if (state.phase === 'over') break; }
-  }
+  } else updateVisuals(dt);
+  if (role === 'host') { netAcc += dt; if (netAcc >= 1 / 12) { netAcc = 0; broadcast(); } }
+  abAcc += dt; if (abAcc > 0.25) { abAcc = 0; updateAbilityUI(); }
   render();
   requestAnimationFrame(frame);
 }
 buildShop();
-reset();
+reset('normal');
+try {
+  const q = new URLSearchParams(location.search).get('room');
+  if (q && /^[A-Za-z0-9]{5}$/.test(q)) { $('codeIn').value = q.toUpperCase(); menuMsg(`偵測到房間 ${q.toUpperCase()}，連線中…`); setTimeout(() => joinRoom(q), 400); }
+} catch (e) {}
 requestAnimationFrame(frame);
 })();
 </script>
