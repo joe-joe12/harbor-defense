@@ -94,6 +94,8 @@ input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--lin
   h1{font-size:26px}
   #selPanel.active{order:-1;border-color:var(--amber)}
 }
+.page{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px;max-width:640px}
+textarea{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--line);border-radius:6px;padding:8px 12px;width:100%;resize:vertical;-webkit-user-select:text;user-select:text;word-break:break-all}
 @media (prefers-reduced-motion:reduce){button{transition:none}}
 </style>
 </head>
@@ -109,7 +111,36 @@ input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--lin
     </div>
   </header>
 
-  <div class="main">
+  <nav class="seg" id="tabs" aria-label="分頁">
+    <button type="button" data-t="game" aria-pressed="true">遊戲</button>
+    <button type="button" data-t="gacha" aria-pressed="false">抽塔</button>
+    <button type="button" data-t="loadout" aria-pressed="false">選塔</button>
+    <button type="button" data-t="save" aria-pressed="false">存檔</button>
+  </nav>
+  <div id="metaPage" hidden>
+    <section class="page" id="pg-gacha" hidden>
+      <p class="muted">星幣：<span class="coin" id="mCoin"></span>　保底：<span id="mPity"></span>/10</p>
+      <div class="seg"><button type="button" id="bn-std" aria-pressed="true">一般卡池</button><button type="button" id="bn-up" aria-pressed="false">精選卡池（史詩機率高）</button></div>
+      <div class="row"><button type="button" id="pull1">單抽</button><button type="button" id="pull10">十連抽</button></div>
+      <p class="muted" id="mRes">重複抽到會升星（每星 +5% 傷害，最高 5 星）。</p>
+    </section>
+    <section class="page" id="pg-loadout" hidden>
+      <p class="muted">點選要帶入遊戲的砲塔（最多 4 座），回到「遊戲」分頁生效。</p>
+      <div class="shop" id="mList"></div>
+    </section>
+    <section class="page" id="pg-save" hidden>
+      <p class="muted" id="sInfo"></p>
+      <p class="muted">進度會自動存在這個裝置。換裝置或備份時，複製下面的代碼，到另一邊貼上匯入。</p>
+      <textarea id="saveOut" readonly rows="3" aria-label="存檔代碼"></textarea>
+      <button type="button" id="saveCopy">複製存檔代碼</button>
+      <textarea id="saveIn" rows="3" placeholder="貼上存檔代碼" aria-label="匯入代碼"></textarea>
+      <button type="button" id="saveLoad">匯入存檔</button>
+      <button type="button" id="saveClear">清除存檔</button>
+      <p class="muted" id="sMsg"></p>
+    </section>
+  </div>
+
+  <div class="main" id="mainView">
     <div class="stagecol">
       <section class="stage">
         <canvas id="cv" aria-label="塔防戰場"></canvas>
@@ -131,18 +162,6 @@ input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--lin
               <button class="narrow" id="joinBtn" type="button">加入</button>
             </div>
             <p class="muted" id="menuMsg"></p>
-          </div>
-        </div>
-
-        <div class="overlay" id="metaOv" hidden>
-          <div class="ocard">
-            <h2>抽塔・選塔</h2>
-            <p class="muted">星幣：<span class="coin" id="mCoin"></span>　保底：<span id="mPity"></span>/10</p>
-            <div class="row"><button id="pull1" type="button">單抽 100</button><button id="pull10" type="button">十連抽 900</button></div>
-            <p class="muted" id="mRes">重複抽到會升星（每星 +5% 傷害，最高 5 星）。</p>
-            <p class="muted">點選要帶入的砲塔（最多 4 座）</p>
-            <div class="shop" id="mList"></div>
-            <button class="primary" id="mBack" type="button">完成</button>
           </div>
         </div>
 
@@ -1304,7 +1323,7 @@ $('diffSeg').addEventListener('click', ev => {
 });
 document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-  if (ev.target && ev.target.tagName === 'INPUT') return;
+  if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA')) return;
   const k = ev.key;
   if (k >= '1' && k <= '6') { if (LK[+k - 1]) arm(LK[+k - 1]); return; }
   if (k === 'Escape') { armed = null; armedAb = null; pending = null; selected = null; selKey = ''; refreshAll(); return; }
@@ -1338,9 +1357,11 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
+const POOLS = { std: { w: [60, 30, 10], c: 100 }, up: { w: [40, 38, 22], c: 150 } };
+let curPool = 'std';
 function pullOne() {
   meta.pity++;
-  let r = Math.random() * 100; r = r < 60 ? 0 : r < 90 ? 1 : 2;
+  const W3 = POOLS[curPool].w; let r = Math.random() * 100; r = r < W3[0] ? 0 : r < W3[0] + W3[1] ? 1 : 2;
   if (meta.pity >= 10 && r === 0) r = 1;
   if (r > 0) meta.pity = 0;
   const pool = TK.filter(k => RAR[k] === r), k = pool[Math.floor(Math.random() * pool.length)], o = meta.owned[k], n = TOWERS[k].name;
@@ -1349,7 +1370,7 @@ function pullOne() {
   meta.coin += 30; return `${n}（滿星，+30）`;
 }
 function pull(n) {
-  const cost = n === 10 ? 900 : 100;
+  const cost = POOLS[curPool].c * (n === 10 ? 9 : 1);
   if (meta.coin < cost) { $('mRes').textContent = '星幣不足，打贏一局可以獲得更多。'; return; }
   meta.coin -= cost; const out = [];
   for (let i = 0; i < n; i++) out.push(pullOne());
@@ -1357,6 +1378,9 @@ function pull(n) {
 }
 function renderMeta() {
   $('coinTxt').textContent = meta.coin; $('mCoin').textContent = meta.coin; $('mPity').textContent = meta.pity;
+  $('bn-std').setAttribute('aria-pressed', curPool === 'std' ? 'true' : 'false'); $('bn-up').setAttribute('aria-pressed', curPool === 'up' ? 'true' : 'false');
+  $('pull1').textContent = '單抽 ' + POOLS[curPool].c; $('pull10').textContent = '十連抽 ' + POOLS[curPool].c * 9;
+  $('sInfo').textContent = `星幣 ${meta.coin}｜已擁有 ${Object.keys(meta.owned).length}/${TK.length} 座｜最佳 ${best} 波`; $('saveOut').value = exportCode();
   $('mList').innerHTML = '';
   TK.forEach(k => {
     const d = TOWERS[k], o = meta.owned[k], b = document.createElement('button');
@@ -1372,10 +1396,49 @@ function renderMeta() {
     $('mList').appendChild(b);
   });
 }
-$('metaBtn').addEventListener('click', () => { renderMeta(); $('metaOv').hidden = false; });
+function exportCode() { return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, meta, best })))); }
+function importCode(txt) {
+  try {
+    const o = JSON.parse(decodeURIComponent(escape(atob(txt.trim())))), m = o.meta;
+    if (!m || typeof m.owned !== 'object') return false;
+    const ow = {};
+    for (const k of TK) { const v = +m.owned[k]; if (v >= 1) ow[k] = Math.min(5, Math.floor(v)); }
+    if (!Object.keys(ow).length) return false;
+    const lo = (Array.isArray(m.loadout) ? m.loadout : []).filter(k => ow[k]).slice(0, 4);
+    meta = { coin: Math.max(0, Math.floor(+m.coin) || 0), owned: ow, loadout: lo.length ? lo : [Object.keys(ow)[0]], pity: Math.min(9, Math.max(0, Math.floor(+m.pity) || 0)) };
+    if (+o.best > best) { best = Math.floor(+o.best); try { localStorage.setItem(KEY, String(best)); } catch (e) {} }
+    saveMeta(); return true;
+  } catch (e) { return false; }
+}
+function setTab(t) {
+  LK = meta.loadout.filter(k => meta.owned[k]); if (!LK.length) LK = ['gun'];
+  for (const b of document.querySelectorAll('#tabs button')) b.setAttribute('aria-pressed', b.dataset.t === t ? 'true' : 'false');
+  $('mainView').hidden = t !== 'game'; $('metaPage').hidden = t === 'game';
+  for (const p of ['gacha', 'loadout', 'save']) $('pg-' + p).hidden = p !== t;
+  if (t !== 'game' && state.phase === 'running' && role !== 'guest') state.paused = true;
+  if (t === 'game') buildShop();
+  renderMeta(); updateStats();
+}
+for (const b of document.querySelectorAll('#tabs button')) b.addEventListener('click', () => setTab(b.dataset.t));
+$('metaBtn').addEventListener('click', () => setTab('gacha'));
+$('bn-std').addEventListener('click', () => { curPool = 'std'; renderMeta(); });
+$('bn-up').addEventListener('click', () => { curPool = 'up'; renderMeta(); });
+$('saveCopy').addEventListener('click', () => { copyText($('saveOut').value, $('saveOut')); $('sMsg').textContent = '已複製存檔代碼，請貼到安全的地方保存。'; });
+$('saveLoad').addEventListener('click', () => {
+  $('sMsg').textContent = importCode($('saveIn').value) ? '匯入成功。' : '代碼無法辨識，請確認完整貼上。';
+  $('saveIn').value = ''; renderMeta();
+});
+let clearArm = 0;
+$('saveClear').addEventListener('click', () => {
+  if (!clearArm) { clearArm = 1; $('saveClear').textContent = '再按一次確認清除'; setTimeout(() => { clearArm = 0; $('saveClear').textContent = '清除存檔'; }, 4000); return; }
+  clearArm = 0; $('saveClear').textContent = '清除存檔';
+  meta = { coin: 300, owned: { gun: 1, cannon: 1, frost: 1 }, loadout: ['gun', 'cannon', 'frost'], pity: 0 };
+  best = 0; try { localStorage.setItem(KEY, '0'); } catch (e) {}
+  saveMeta(); $('sMsg').textContent = '已清除存檔。'; renderMeta();
+});
 $('pull1').addEventListener('click', () => pull(1));
 $('pull10').addEventListener('click', () => pull(10));
-$('mBack').addEventListener('click', () => { LK = meta.loadout.filter(k => meta.owned[k]); $('metaOv').hidden = true; buildShop(); refreshAll(); renderMeta(); });
+
 renderMeta();
 buildShop();
 reset('normal');
