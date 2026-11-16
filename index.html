@@ -124,12 +124,25 @@ input{font:inherit;color:var(--fg);background:#0f242c;border:1px solid var(--lin
               <button type="button" data-d="hard" aria-pressed="false">困難</button>
             </div>
             <button class="primary" id="soloBtn" type="button">單人遊戲</button>
-            <button id="hostBtn" type="button">建立連線房間</button>
+            <button id="metaBtn" type="button">抽塔・選塔　<span class="coin" id="coinTxt"></span></button>
+            <button id="hostBtn" type="button">建立連線房間（需自行架站）</button>
             <div class="row">
               <input id="codeIn" maxlength="5" placeholder="房間代碼" autocomplete="off" aria-label="房間代碼">
               <button class="narrow" id="joinBtn" type="button">加入</button>
             </div>
             <p class="muted" id="menuMsg"></p>
+          </div>
+        </div>
+
+        <div class="overlay" id="metaOv" hidden>
+          <div class="ocard">
+            <h2>抽塔・選塔</h2>
+            <p class="muted">星幣：<span class="coin" id="mCoin"></span>　保底：<span id="mPity"></span>/10</p>
+            <div class="row"><button id="pull1" type="button">單抽 100</button><button id="pull10" type="button">十連抽 900</button></div>
+            <p class="muted" id="mRes">重複抽到會升星（每星 +5% 傷害，最高 5 星）。</p>
+            <p class="muted">點選要帶入的砲塔（最多 4 座）</p>
+            <div class="shop" id="mList"></div>
+            <button class="primary" id="mBack" type="button">完成</button>
           </div>
         </div>
 
@@ -250,12 +263,19 @@ const TOWERS = {
   gun:     { name: '機槍塔', cost: 60,  range: 130, rate: 0.28, dmg: 9,   color: '#f2b441', desc: '射速快，穩定輸出' },
   cannon:  { name: '加農砲', cost: 120, range: 150, rate: 1.4,  dmg: 36,  splash: 58, color: '#e8744f', desc: '爆炸範圍傷害，剋制群體' },
   frost:   { name: '冰霜塔', cost: 90,  range: 115, rate: 1.1,  dmg: 5,   slow: 0.45, color: '#7fd8f0', desc: '範圍減速並造成輕傷' },
-  sniper:  { name: '狙擊塔', cost: 160, range: 270, rate: 2.2,  dmg: 110, color: '#b9e36a', desc: '超遠射程，單發重傷' },
-  arc:     { name: '電弧塔', cost: 140, range: 140, rate: 1.0,  dmg: 28,  chain: 3, color: '#c79bff', desc: '閃電連鎖，同時打多艘' },
+  sniper:  { name: '狙擊塔', cost: 160, range: 270, rate: 2.2,  dmg: 90, color: '#b9e36a', desc: '超遠射程，單發重傷' },
+  arc:     { name: '電弧塔', cost: 140, range: 140, rate: 1.0,  dmg: 28,  chain: 2, color: '#c79bff', desc: '閃電連鎖，同時打多艘' },
   support: { name: '增幅塔', cost: 110, range: 110, rate: 99,   dmg: 0,   color: '#5eead4', desc: '提升範圍內砲塔的傷害' }
 };
 const TK = Object.keys(TOWERS);
-const SUP = [0.2, 0.32, 0.45];
+const RAR = { gun: 0, cannon: 0, frost: 0, arc: 1, support: 1, sniper: 2 }, RN = ['普通', '稀有', '史詩'], META_KEY = 'harbor-meta';
+let meta = { coin: 300, owned: { gun: 1, cannon: 1, frost: 1 }, loadout: ['gun', 'cannon', 'frost'], pity: 0 };
+try { const m = JSON.parse(localStorage.getItem(META_KEY)); if (m && m.owned) meta = m; } catch (e) {}
+const saveMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} };
+let LK = meta.loadout.filter(k => meta.owned[k]);
+if (!LK.length) LK = ['gun'];
+const starMul = k => 1 + 0.05 * ((meta.owned[k] || 1) - 1);
+const SUP = [0.15, 0.24, 0.34];
 const ENEMIES = {
   swift:    { name: '小艇',   hp: 38,   speed: 78, reward: 5,   size: 8,  armor: 0, dmg: 1, color: '#ff9a8a' },
   patrol:   { name: '巡邏艦', hp: 105,  speed: 52, reward: 9,   size: 11, armor: 0, dmg: 1, color: '#e0525e' },
@@ -266,7 +286,7 @@ const ENEMIES = {
 };
 const EK = Object.keys(ENEMIES);
 const DIFF = { easy: { hp: 0.75, gold: 240, lives: 25 }, normal: { hp: 1, gold: 180, lives: 20 }, hard: { hp: 1.35, gold: 150, lives: 12 } };
-const AB = { air: { cd: 40 }, freeze: { cd: 60 } };
+const AB = { air: { cd: 40 }, freeze: { cd: 75 } };
 const MODES = { first: '最前方', strong: '最強', close: '最近' };
 const MODE_ORDER = ['first', 'strong', 'close'];
 const PH = ['idle', 'running', 'over'];
@@ -285,14 +305,14 @@ function buffAt(t) {
     const r = TOWERS.support.range * (1 + 0.08 * (s.lvl - 1));
     if (Math.hypot(s.x - t.x, s.y - t.y) <= r) b += SUP[s.lvl - 1];
   }
-  return Math.min(0.9, b);
+  return Math.min(0.6, b);
 }
 function stats(t) {
   const d = TOWERS[t.type], l = t.lvl;
   return {
     range: d.range * (1 + 0.08 * (l - 1)),
-    rate: d.rate * Math.pow(0.88, l - 1),
-    dmg: d.dmg * [1, 1.7, 2.6][l - 1] * (t.type === 'support' ? 1 : 1 + buffAt(t)),
+    rate: d.rate * Math.pow(0.92, l - 1),
+    dmg: d.dmg * [1, 1.5, 2.1][l - 1] * starMul(t.type) * (t.type === 'support' ? 1 : 1 + buffAt(t)),
     splash: d.splash ? d.splash * (1 + 0.1 * (l - 1)) : 0,
     slow: d.slow ? Math.min(0.7, d.slow + 0.1 * (l - 1)) : 0,
     chain: d.chain ? d.chain + l - 1 : 0,
@@ -508,7 +528,7 @@ function useAir(x, y) {
   if (state.cd.air > 0) return fail('空襲還在冷卻。');
   if (!(x >= 0 && x <= W && y >= 0 && y <= H)) return fail('');
   state.cd.air = AB.air.cd;
-  const dmg = 120 + state.wave * 14;
+  const dmg = 100 + state.wave * 10;
   for (let i = 0; i < 7; i++) {
     const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 80;
     strikes.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, t: 0.8 + i * 0.12, dmg });
@@ -519,7 +539,7 @@ function useAir(x, y) {
 function useFreeze() {
   if (state.cd.freeze > 0) return fail('凍結還在冷卻。');
   state.cd.freeze = AB.freeze.cd;
-  for (const e of enemies) { if (!e.alive) continue; e.slow = Math.max(e.slowT > 0 ? e.slow : 0, 0.9); e.slowT = Math.max(e.slowT, 3); }
+  for (const e of enemies) { if (!e.alive) continue; e.slow = Math.max(e.slowT > 0 ? e.slow : 0, 0.8); e.slowT = Math.max(e.slowT, 3); }
   emit({ e: 'ring', x: W / 2, y: H / 2, max: 700, life: 0.8, color: '#7fd8f0', s: 'freezeAll' });
   return { ok: true, msg: '全場敵艦被凍結 3 秒。' };
 }
@@ -594,7 +614,7 @@ function fire(t, s, e) {
       hit.add(target);
       emit({ e: 'line', x1: Math.round(from.x), y1: Math.round(from.y), x2: Math.round(target.x), y2: Math.round(target.y), life: 0.2, color: col, s: i ? '' : 'zap' });
       from = { x: target.x, y: target.y };
-      damage(target, dmg); dmg *= 0.8;
+      damage(target, dmg); dmg *= 0.75;
       let nx = null, nd = 1e9;
       for (const q of enemies) {
         if (!q.alive || hit.has(q)) continue;
@@ -639,10 +659,12 @@ function showOver() {
   const win = state.win;
   const reached = win ? (state.endless ? state.wave : MAX_WAVE) : Math.max(0, state.wave - 1);
   if (reached > best) { best = reached; try { localStorage.setItem(KEY, String(best)); } catch (e) {} }
+  let earn = 0;
+  if (role !== 'guest' && !state.paid) { state.paid = true; earn = reached * 6 + (win ? 100 : 0) + Math.floor(kills / 10); meta.coin += earn; saveMeta(); }
   $('oTitle').textContent = win ? '港口守住了' : '港口失守';
   $('oText').textContent = win ? `撐過全部 ${MAX_WAVE} 波，擊沉 ${kills} 艘敵艦。`
     : state.endless ? `無盡模式撐到第 ${reached} 波，擊沉 ${kills} 艘敵艦。` : `撐過 ${reached} 波，擊沉 ${kills} 艘敵艦。`;
-  $('oBest').textContent = `最佳紀錄：${best} 波`;
+  $('oBest').textContent = `最佳紀錄：${best} 波` + (earn ? `　獲得星幣 ${earn}` : '');
   const guest = role === 'guest';
   $('againBtn').hidden = guest;
   $('contBtn').hidden = guest || !win || state.endless;
@@ -898,7 +920,7 @@ function render() {
 function buildShop() {
   const shop = $('shop');
   shop.innerHTML = '';
-  TK.forEach((k, i) => {
+  LK.forEach((k, i) => {
     const d = TOWERS[k];
     const b = document.createElement('button');
     b.type = 'button'; b.id = 'tw-' + k; b.className = 'tw';
@@ -1051,7 +1073,7 @@ function startHost(tries) {
   menuMsg('建立房間中…');
   const code = randCode(); let done = false, tmo = 0;
   try { peer = new Peer('harbor-' + code); } catch (e) { menuMsg('這個環境不支援連線功能。'); return; }
-  tmo = setTimeout(() => { if (!done) { menuMsg('連不上配對伺服器。此環境可能不支援連線，請部署到網站後再試。'); cleanupPeer(); } }, 10000);
+  tmo = setTimeout(() => { if (!done) { menuMsg('連不上配對伺服器。預覽或發布頁會擋掉外部連線，請把檔案部署到自己的網站（如 GitHub Pages）再試。'); cleanupPeer(); } }, 10000);
   peer.on('open', () => {
     done = true; clearTimeout(tmo);
     role = 'host'; roomCode = code; myId = 0;
@@ -1103,7 +1125,7 @@ function joinRoom(code) {
   menuMsg('連線中…');
   let ok = false, tmo = 0;
   try { peer = new Peer(); } catch (e) { menuMsg('這個環境不支援連線功能。'); return; }
-  tmo = setTimeout(() => { if (!ok) { menuMsg('連線逾時，請確認代碼與網路，或此環境不支援連線。'); cleanupPeer(); } }, 15000);
+  tmo = setTimeout(() => { if (!ok) { menuMsg('連線逾時。請確認代碼，且房主與你都在自己的網站（如 GitHub Pages）上開啟遊戲。'); cleanupPeer(); } }, 15000);
   peer.on('open', () => {
     const c = peer.connect('harbor-' + code, { reliable: true, serialization: 'json' });
     hostConn = c;
@@ -1284,7 +1306,7 @@ document.addEventListener('keydown', ev => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if (ev.target && ev.target.tagName === 'INPUT') return;
   const k = ev.key;
-  if (k >= '1' && k <= '6') { arm(TK[+k - 1]); return; }
+  if (k >= '1' && k <= '6') { if (LK[+k - 1]) arm(LK[+k - 1]); return; }
   if (k === 'Escape') { armed = null; armedAb = null; pending = null; selected = null; selKey = ''; refreshAll(); return; }
   if (k === ' ') {
     if (ev.target.closest && ev.target.closest('button')) return;
@@ -1316,6 +1338,45 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
+function pullOne() {
+  meta.pity++;
+  let r = Math.random() * 100; r = r < 60 ? 0 : r < 90 ? 1 : 2;
+  if (meta.pity >= 10 && r === 0) r = 1;
+  if (r > 0) meta.pity = 0;
+  const pool = TK.filter(k => RAR[k] === r), k = pool[Math.floor(Math.random() * pool.length)], o = meta.owned[k], n = TOWERS[k].name;
+  if (!o) { meta.owned[k] = 1; return `${n}（新）`; }
+  if (o < 5) { meta.owned[k] = o + 1; return `${n} ★${o + 1}`; }
+  meta.coin += 30; return `${n}（滿星，+30）`;
+}
+function pull(n) {
+  const cost = n === 10 ? 900 : 100;
+  if (meta.coin < cost) { $('mRes').textContent = '星幣不足，打贏一局可以獲得更多。'; return; }
+  meta.coin -= cost; const out = [];
+  for (let i = 0; i < n; i++) out.push(pullOne());
+  saveMeta(); $('mRes').textContent = '獲得：' + out.join('、'); renderMeta();
+}
+function renderMeta() {
+  $('coinTxt').textContent = meta.coin; $('mCoin').textContent = meta.coin; $('mPity').textContent = meta.pity;
+  $('mList').innerHTML = '';
+  TK.forEach(k => {
+    const d = TOWERS[k], o = meta.owned[k], b = document.createElement('button');
+    b.type = 'button'; b.className = 'tw'; b.style.setProperty('--c', d.color); b.disabled = !o;
+    b.setAttribute('aria-pressed', meta.loadout.includes(k) ? 'true' : 'false');
+    b.innerHTML = `<b>${d.name}</b><small>${RN[RAR[k]]}　${o ? '★'.repeat(o) : '未擁有'}</small>`;
+    b.addEventListener('click', () => {
+      const i = meta.loadout.indexOf(k);
+      if (i >= 0) { if (meta.loadout.length > 1) meta.loadout.splice(i, 1); }
+      else if (meta.loadout.length < 4) meta.loadout.push(k);
+      saveMeta(); renderMeta();
+    });
+    $('mList').appendChild(b);
+  });
+}
+$('metaBtn').addEventListener('click', () => { renderMeta(); $('metaOv').hidden = false; });
+$('pull1').addEventListener('click', () => pull(1));
+$('pull10').addEventListener('click', () => pull(10));
+$('mBack').addEventListener('click', () => { LK = meta.loadout.filter(k => meta.owned[k]); $('metaOv').hidden = true; buildShop(); refreshAll(); renderMeta(); });
+renderMeta();
 buildShop();
 reset('normal');
 try {
